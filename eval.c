@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdio.h>
+#include <assert.h>
 #include "eval.h"
 
 extern char* input_filename;
@@ -9,6 +10,14 @@ ValueList* insert_value(Value* v, ValueList* next) {
   l->value = v;
   l->next = next;
   return l;
+}
+
+Value* get_value(ValueList* vs, int i) {
+  assert(vs);
+  if (i == 0)
+    return vs->value;
+  else
+    return get_value(vs->next, i - 1);
 }
 
 Value* make_unit_value() {
@@ -45,20 +54,7 @@ Value* make_bool_value(int b) {
   return t;
 }
 
-Value* make_array_value(ValueList* inits) {
-  Value* t = malloc(sizeof(Value));
-  t->tag = ArrayV; 
-  int n = value_list_len(inits);
-  t->u.array.len = n;
-  t->u.array.data = malloc(n * sizeof(Value));
-  for (int i = 0; i != n; ++i) {
-    t->u.array.data[i] = inits->value;
-    inits = inits->next;
-  }
-  return t;
-}
-
-Value* make_procedure(TypeEnv* params, Term* body, Env* env) {
+Value* make_procedure(VarList* params, Term* body, Env* env) {
   Value* t = malloc(sizeof(Value));
   t->tag = ProcV; 
   t->u.proc.params = params;
@@ -135,11 +131,11 @@ Handler* find_handler(char* name, Handler* h) {
 Value* apply(Value* rator, ValueList* rands, int depth) {
   switch (rator->tag) {
   case ProcV: {
-    TypeEnv* params = rator->u.proc.params;
+    VarList* params = rator->u.proc.params;
     Env* env = rator->u.proc.env;
     while (params && rands) {
       env = make_env(params->var, rands->value, env);
-      params = params->rest;
+      params = params->next;
       rands = rands->next;
     }
     return eval(rator->u.proc.body, env, depth);
@@ -217,73 +213,6 @@ Value* eval(Term* e, Env* env, int depth) {
       return val;
     }
   }
-  case Array: {
-    ValueList* vs = eval_list(e->u.array.inits, env, depth);
-    return make_array_value(vs);
-  }
-  case ArrayComp: {
-    Value* size = eval(e->u.array_comp.size, env, depth);
-    Value* init_fun = eval(e->u.array_comp.init_fun, env, depth);
-    if (size->tag == IntT) {
-      int n = size->u._int;
-      Value* array = malloc(sizeof(Value));
-      array->tag = ArrayV; 
-      array->u.array.len = n;
-      array->u.array.data = malloc(n * sizeof(Value));
-      for (int i = 0; i != n; ++i) {
-	Value* index = make_int_value(i);
-	array->u.array.data[i] = apply(init_fun, insert_value(index, 0), depth);
-      }
-      return array;
-    } else {
-      printf("Error, expected integer size for array comprehension\n");
-      exit(-1);
-    }
-
-  }
-  case Index: {
-    Value* array = eval(e->u.index.array, env, depth);
-    Value* ind = eval(e->u.index.i, env, depth);
-    switch (array->tag) {
-    case ArrayV: {
-      switch (ind->tag) {
-      case IntV: {
-	int n = array->u.array.len;
-	int i = ind->u._int;
-	if (i < n) {
-	  return array->u.array.data[i];
-	} else {
-	  fprintf(stdout, "%s:%d:Error, attempt to index %d beyond end of array %d\n", 
-		  input_filename, e->lineno, i, n);
-	}
-      }
-      default:
-	printf("Error, expected integer index in index expression\n");
-	exit(-1);
-      } /* switch (ind->tag) */
-    }
-    case StringV: {
-      switch (ind->tag) {
-      case IntV: {
-	int n = strlen(array->u.str);
-	int i = ind->u._int;
-	if (i < n) {
-	  return make_char_value(array->u.str[i]);
-	} else {
-	  printf("Error, attempt to index beyond end of string\n");
-	  exit(-1);
-	}
-      }
-      default:
-	printf("Error, expected integer index in index expression\n");
-      } /* switch (ind->tag) */
-    }
-    default:
-      fprintf(stdout, "%s:%d: Error, expected a string or array in index expression\n",
-	     input_filename, e->lineno);
-      exit(-1);
-    }
-  }
   case Lam: {
     return make_procedure(e->u.lam.params, e->u.lam.body, env);
   }
@@ -303,127 +232,41 @@ Value* eval(Term* e, Env* env, int depth) {
     Env* env2 = make_env(e->u.let.var, rhs, env);
     return eval(e->u.let.body, env2, depth);
   }
-  case UniOp: {
-    Value* v = eval(e->u.uniop.expr, env, depth);
-    if (v->tag == IntV && e->u.uniop.tag == Neg) {
-      return make_int_value(- v->u._int);
-    } else if (v->tag == StringV && e->u.uniop.tag == Len) {
-      return make_int_value(strlen(v->u.str));
-    } else if (v->tag == ArrayV && e->u.uniop.tag == Len) {
-      return make_int_value(v->u.array.len);
-    } else if (v->tag == BoolV && e->u.uniop.tag == Not) {
-      return make_bool_value(! v->u._bool);
-    } else {
-      fprintf(stderr, "%s:%d: Error: operator %s is not applicable to ",
-	      input_filename, e->lineno, uniop_to_string(e->u.uniop.tag));
-      print_value(v); printf("\n");
+  case Op: {
+    ValueList* arg_vals = 0;
+    
+    for (TermList* args = e->u.op.args; args != 0; args = args->next) {
+      Value* v = eval(args->term, env, depth);
+      arg_vals = insert_value(v, arg_vals);
     }
-    return 0;
-  }
-  case BinOp: {
-    Value* left = eval(e->u.binop.left, env, depth);
-    Value* right = eval(e->u.binop.right, env, depth);
-    if (left->tag == BoolV && right->tag == BoolV) {
-      switch (e->u.binop.tag) {
-      case And:
-	return make_bool_value(left->u._bool && right->u._bool);
-      case Or:
+    switch (e->u.op.tag) {
+    case Neg: {
+      Value* v = get_value(arg_vals, 0);
+      assert (arg_vals && v->tag == IntV);
+      return make_int_value(- v->u._int);
+    }
+    case Len: {
+      Value* v = get_value(arg_vals, 0);
+      assert (arg_vals && v->tag == StringV);
+      return make_int_value(strlen(v->u.str));
+    }
+    case Not: {
+      Value* v = get_value(arg_vals, 0);
+      assert (arg_vals && v->tag == BoolV);
+      return make_bool_value(! v->u._bool);
+    }
+    case And: {
+      Value* left = get_value(arg_vals, 0);
+      Value* right = get_value(arg_vals, 1);
+      assert(left->tag == BoolV && right->tag == BoolV);
+      return make_bool_value(left->u._bool && right->u._bool);
+    }
+    case Or: {
+      Value* left = get_value(arg_vals, 0);
+      Value* right = get_value(arg_vals, 1);
+      if (left->tag == BoolV && right->tag == BoolV) {
 	return make_bool_value(left->u._bool || right->u._bool);
-      case Equal:
-	return make_bool_value(left->u._bool == right->u._bool);
-      default:
-	printf("Error, operator '%s' not applicable to Booleans\n",
-	       binop_to_string(e->u.binop.tag));
-	exit(-1);
-      }
-    } else if (left->tag == IntV && right->tag == IntV) {
-      switch (e->u.binop.tag) {
-      case Add:
-	return make_int_value(left->u._int + right->u._int);
-      case Sub:
-	return make_int_value(left->u._int - right->u._int);
-      case Mul:
-	return make_int_value(left->u._int * right->u._int);
-      case Div:
-	return make_int_value(left->u._int / right->u._int);
-      case Mod:
-	return make_int_value(left->u._int % right->u._int);
-      case Equal:
-	return make_bool_value(left->u._int == right->u._int);
-      case Less:
-	return make_bool_value(left->u._int < right->u._int);
-      default:
-	printf("Error, operator '%s' not applicable to integers\n",
-	       binop_to_string(e->u.binop.tag));
-	exit(-1);
-      } /* end switch */
-    } else if (left->tag == CharV && right->tag == CharV) {
-      switch (e->u.binop.tag) {
-      case Equal:
-	return make_bool_value(left->u._char == right->u._char);
-      case Add: {
-	char* s = malloc(3 * sizeof(char));
-	s[0] = left->u._char;
-	s[1] = right->u._char;
-	s[2] = 0;
-	return make_string_value(s);
-      }
-      default:
-	printf("Error, operator not applicable to characters\n");
-	exit(-1);
-      }
-    } else if (left->tag == StringV && right->tag == StringV) {
-      switch (e->u.binop.tag) {
-      case Equal:
-	return make_bool_value(strcmp(left->u.str, right->u.str) == 0);
-      case Add: {
-	int ln = strlen(left->u.str);
-	int rn = strlen(right->u.str);
-	char* lr = malloc((ln + rn + 1) * sizeof(char));
-	strcpy(lr, left->u.str);
-	strcpy(lr + ln, right->u.str);
-	return make_string_value(lr);
-      }
-      default:
-	printf("Error, operator not applicable to strings\n");
-	exit(-1);
-      } /* end switch */
-
-    } else if (left->tag == CharV && right->tag == StringV) {
-      switch (e->u.binop.tag) {
-      case Add: {
-	int rn = strlen(right->u.str);
-	char* lr = malloc((1 + rn + 1) * sizeof(char));
-	lr[0] = left->u._char;
-	strcpy(lr + 1, right->u.str);
-	return make_string_value(lr);
-      }
-      default:
-	printf("Error, operator not applicable to strings\n");
-	exit(-1);
-      } /* end switch */
-
-    } else if (left->tag == StringV && right->tag == CharV) {
-      switch (e->u.binop.tag) {
-      case Equal:
-	return make_bool_value(strcmp(left->u.str, right->u.str) == 0);
-      case Add: {
-	int ln = strlen(left->u.str);
-	int rn = 1;
-	char* lr = malloc((ln + rn + 1) * sizeof(char));
-	strcpy(lr, left->u.str);
-	lr[ln] = right->u._char;
-	lr[ln+1] = 0;
-	return make_string_value(lr);
-      }
-      default:
-	printf("Error, operator not applicable to strings\n");
-	exit(-1);
-      } /* end switch */
-
-    } else if (left->tag == HandlerV && right->tag == HandlerV) {
-      switch (e->u.binop.tag) {
-      case Or: {
+      } else if (left->tag == HandlerV && right->tag == HandlerV) {
 	Handler* r = right->u.handler;
 	Handler* l = left->u.handler;
 	while (l != 0) {
@@ -433,18 +276,87 @@ Value* eval(Term* e, Env* env, int depth) {
 	}
 	return make_handler_value(r);
       }
-      default:
-	fprintf(stdout, "Error, operator not applicable to handlers\n");
-	exit(-1);
-      } /* end switch */
+    }	
+    case Equal: {
+      Value* left = get_value(arg_vals, 0);
+      Value* right = get_value(arg_vals, 1);
+      if (left->tag == BoolV && right->tag == BoolV) {      
+	return make_bool_value(left->u._bool == right->u._bool);
+      } else if (left->tag == IntV && right->tag == IntV) {
+	return make_bool_value(left->u._int == right->u._int);
+      } else if (left->tag == CharV && right->tag == CharV) {
+	return make_bool_value(left->u._char == right->u._char);
+      } else if (left->tag == StringV && right->tag == StringV) {
+	return make_bool_value(strcmp(left->u.str, right->u.str) == 0);
+      }
+    }
+    case Add: {
+      Value* left = get_value(arg_vals, 0);
+      Value* right = get_value(arg_vals, 1);
+      if (left->tag == IntV && right->tag == IntV) {      
+	return make_int_value(left->u._int + right->u._int);
+      } else if (left->tag == CharV && right->tag == CharV) {
+	char* s = malloc(3 * sizeof(char));
+	s[0] = left->u._char;
+	s[1] = right->u._char;
+	s[2] = 0;
+	return make_string_value(s);
+      } else if (left->tag == StringV && right->tag == StringV) {
+	int ln = strlen(left->u.str);
+	int rn = strlen(right->u.str);
+	char* lr = malloc((ln + rn + 1) * sizeof(char));
+	strcpy(lr, left->u.str);
+	strcpy(lr + ln, right->u.str);
+	return make_string_value(lr);
+      } else if (left->tag == CharV && right->tag == StringV) {
+	int rn = strlen(right->u.str);
+	char* lr = malloc((1 + rn + 1) * sizeof(char));
+	lr[0] = left->u._char;
+	strcpy(lr + 1, right->u.str);
+	return make_string_value(lr);
+      } else if (left->tag == StringV && right->tag == CharV) {
+	int ln = strlen(left->u.str);
+	int rn = 1;
+	char* lr = malloc((ln + rn + 1) * sizeof(char));
+	strcpy(lr, left->u.str);
+	lr[ln] = right->u._char;
+	lr[ln+1] = 0;
+	return make_string_value(lr);
+      }
+    }
+    case Sub: {
+      Value* left = get_value(arg_vals, 0);
+      Value* right = get_value(arg_vals, 1);
+      return make_int_value(left->u._int - right->u._int);
+    }
+    case Mul: {
+      Value* left = get_value(arg_vals, 0);
+      Value* right = get_value(arg_vals, 1);
+      return make_int_value(left->u._int * right->u._int);
+    }
+    case Div: {
+      Value* left = get_value(arg_vals, 0);
+      Value* right = get_value(arg_vals, 1);
+      return make_int_value(left->u._int / right->u._int);
+    }
+    case Mod: {
+      Value* left = get_value(arg_vals, 0);
+      Value* right = get_value(arg_vals, 1);
+      return make_int_value(left->u._int % right->u._int);
+    }
+    case Less: {
+      Value* left = get_value(arg_vals, 0);
+      Value* right = get_value(arg_vals, 1);
+      return make_bool_value(left->u._int < right->u._int);
+    }
+    default:
+      fprintf(stderr, "%s:%d: Error: operator %s is not applicable to ",
+	      input_filename, e->lineno, op_to_string(e->u.op.tag));
+      print_value_list(arg_vals); printf("\n");
+    }
+    return 0;
+  } // case Op
 
-    } else {
-      printf("Error, unexpected input values to operator '%s'\n",
-	     binop_to_string(e->u.binop.tag));
-      exit(-1); return 0;
-    } /* end if */
-
-  } /* end case BinOp */
   case IfThen: {
     Value* cond = eval(e->u.ifthen.cond, env, depth);
     switch (cond->tag) {
@@ -496,7 +408,7 @@ Value* eval(Term* e, Env* env, int depth) {
   }
   case HandlerTerm: {
     Value* fun = eval(e->u.handler.body, env, depth);
-    return make_handler_value(make_handler(e->u.handler.name, fun, 0));
+    return make_handler_value(make_handler(e->u.handler.var, fun, 0));
   }
   case Case: {
     Value* descr = eval(e->u._case.descr, env, depth);

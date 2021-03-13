@@ -5,7 +5,7 @@
 %}
 %option yylineno
 
-ARRAY   "array"
+AS      "as"
 MOD     "mod"
 NOT     "not"
 AND     "and"
@@ -33,7 +33,6 @@ COLON   ":"
 SEMICOLON   ";"
 PERIOD  "."
 COMMA   ","
-AT      "@"
 EQUAL   "="
 LT      "<"
 GT      ">"
@@ -51,7 +50,6 @@ CHAR    \#.
 COMMENT \/\/[^\n]*\n
 %%
 {FUN} { return FUN; }
-{ARRAY} { return ARRAY; }
 {MOD} { return MOD; }
 {NOT} { return NOT; }
 {AND} { return AND; }
@@ -73,7 +71,6 @@ COMMENT \/\/[^\n]*\n
 {FALSE} { return FALSE; }
 {COLON} { return COLON; }
 {SEMICOLON} { return SEMICOLON; }
-{AT} { return AT; }
 {PERIOD} { return PERIOD; }
 {COMMA} { return COMMA; }
 {PLUS}   { return PLUS; }

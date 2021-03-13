@@ -26,6 +26,7 @@ static Term* program;
    int  num;
    Term* term;
    TermList* term_list;
+   VarList* var_list;
    TermBindingList* fields;
 };
 
@@ -35,6 +36,7 @@ static Term* program;
 %token <str> CHAR
 %type <term> expr
 %type <term_list> expr_list
+%type <var_list> var_list
 %type <term> simple_expr
 %type <fields> fields
 %token ARRAY
@@ -42,18 +44,9 @@ static Term* program;
 %token AND
 %token OR
 %token FUN
-%token FOLD
-%token UNFOLD
-%token AT
 %token REC
 %token TRUE
 %token FALSE
-%token UNITTY
-%token INTTY
-%token STRINGTY
-%token BOOLTY
-%token CHARTY
-%token INPUT
 %token COLON
 %token SEMICOLON
 %token IS
@@ -62,7 +55,7 @@ static Term* program;
 %token QUOTE
 %token TAG
 %token AS
-%token GROUP
+%token RECORD
 %token LP
 %token RP
 %token LC
@@ -88,7 +81,8 @@ static Term* program;
 %token OF
 %token ONE
 %token WITH
-%token TRACE
+%token READ
+%token WRITE
 %right PERIOD
 %nonassoc IS
 %left BUT
@@ -108,7 +102,6 @@ static Term* program;
 %%
 input:
   /* empty */ { }
-| PERIOD { }
 | expr PERIOD {
   Value* v = eval($1, 0, 0); 
   if (v == 0) {
@@ -131,10 +124,10 @@ fields:
 | ID COLON expr { $$ = make_binding($1, $3, 0); }
 | ID COLON expr COMMA fields { $$ = make_binding($1, $3, $5); }
 ;
-id_list:
+var_list:
   /* empty */      { $$ = 0; }
-| ID               {}
-| ID COMMA id_list {}
+| ID               { $$ = insert_var($1, 0); }
+| ID COMMA var_list { $$ = insert_var($1, $3); }
 ;
 expr_list:
   /* empty */          { $$ = 0; }
@@ -149,54 +142,37 @@ simple_expr:
 | ID                { $$ = make_var(yylineno, $1); }
 | STR               { $$ = make_string(yylineno, $1); }
 | CHAR              { $$ = make_char(yylineno, $1[0]); }
-| FUN id_list LC expr RC { $$ = make_lambda(yylineno, $2, $4); }
+| FUN var_list LC expr RC { $$ = make_lambda(yylineno, $2, $4); }
 | LP expr RP       { $$ = $2; }
-| LS expr_list RS { $$ = make_array(yylineno, $2); }
-| BAR expr BAR     { $$ = make_uniop(yylineno, Len, $2); }
+| BAR expr BAR     { $$ = make_op(yylineno, Len, insert_term($2, 0)); }
 | simple_expr LP expr_list RP  { $$ = make_app(yylineno, $1, $3); }
-| simple_expr AT LS type RS { $$ = make_inst(yylineno, $1, $4); }
-| simple_expr LS expr RS  { $$ = make_index(yylineno, $1, $3); }
-| INPUT { $$ = make_string(yylineno, input); }
-| expr POSSES ID   { $$ = make_field_access(yylineno, $1, $3); }
+| expr PERIOD ID   { $$ = make_field_access(yylineno, $1, $3); }
 ;
 expr:
   simple_expr      { $$ = $1; }
-| ARRAY OF simple_expr LP ID RP LC expr RC {
-  TypeEnv* params = make_type_binding($5, make_int_type(yylineno), 0);
-  $$ = make_array_comp(yylineno, $3, make_lambda(yylineno, params, $8));
-}
-| ALL ID expr      { $$ = make_generic(yylineno, $2, $3); }
-| REC LP ID COLON type RP expr { $$ = make_recursive(yylineno, $3, $5, $7); }
-| FOLD LP type RP expr { $$ = make_fold(yylineno, $3, $5); }
-| UNFOLD LP type RP expr { $$ = make_unfold(yylineno, $3, $5); }
+| REC LP ID RP expr { $$ = make_recursive(yylineno, $3, $5); }
 | IF expr THEN expr ELSE expr { $$ = make_ifthen(yylineno, $2, $4, $6); }
-| expr EQUAL expr   { $$ = make_binop(yylineno, Equal, $1, $3); }
-| expr PLUS expr   { $$ = make_binop(yylineno, Add, $1, $3); }
-| expr MINUS expr  { $$ = make_binop(yylineno, Sub, $1, $3); }
-| expr TIMES expr  { $$ = make_binop(yylineno, Mul, $1, $3); }
-| expr DIV expr    { $$ = make_binop(yylineno, Div, $1, $3); }
-| expr AND expr    { $$ = make_binop(yylineno, And, $1, $3); }
-| expr OR expr    { $$ = make_binop(yylineno, Or, $1, $3); }
-| expr LT expr    { $$ = make_binop(yylineno, Less, $1, $3); }
-| expr MOD expr    { $$ = make_binop(yylineno, Mod, $1, $3); }
-| NOT expr         { $$ = make_uniop(yylineno, Not, $2); }
-| MINUS expr       { $$ = make_uniop(yylineno, Neg, $2); }
-| GROUP fields     { $$ = make_record(yylineno, $2); }
+| expr EQUAL expr   { $$ = make_op(yylineno, Equal,
+				   insert_term($1, insert_term($3, 0))); }
+| expr PLUS expr   { $$ = make_op(yylineno, Add,
+				  insert_term($1, insert_term($3, 0))); }
+| expr MINUS expr  { $$ = make_op(yylineno, Sub, insert_term($1, insert_term($3, 0))); }
+| expr TIMES expr  { $$ = make_op(yylineno, Mul, insert_term($1, insert_term($3, 0))); }
+| expr DIV expr    { $$ = make_op(yylineno, Div, insert_term($1, insert_term($3, 0))); }
+| expr AND expr    { $$ = make_op(yylineno, And, insert_term($1, insert_term($3, 0))); }
+| expr OR expr    { $$ = make_op(yylineno, Or, insert_term($1, insert_term($3, 0))); }
+| expr LT expr    { $$ = make_op(yylineno, Less, insert_term($1, insert_term($3, 0))); }
+| expr MOD expr    { $$ = make_op(yylineno, Mod, insert_term($1, insert_term($3, 0))); }
+| NOT expr         { $$ = make_op(yylineno, Not, insert_term($2, 0)); }
+| MINUS expr       { $$ = make_op(yylineno, Neg, insert_term($2, 0)); }
+| RECORD fields    { $$ = make_record(yylineno, $2); }
 | TAG expr AS ID { $$ = make_variant(yylineno, $4, $2); }
-| TAG ID COLON type HANDLE expr { 
-    $$ = make_handler_term(yylineno, $2, $4, $6);
+| TAG ID HANDLE expr { 
+    $$ = make_handler_term(yylineno, $2, $4);
   }
-| TAG ID COLON type LC expr RC { 
-  TypeEnv* params = make_type_binding($2, $4, 0);
-  $$ = make_handler_term(yylineno, $2, $4, make_lambda(yylineno, params, $6));
-}
 | CASE expr OF expr { $$ = make_case(yylineno, $2, $4); }
-| ID IS expr PERIOD expr { $$ = make_let(yylineno, $1, $3, $5); }
-| ID COLON type IS expr PERIOD expr {
-  Term* e = make_ascribe(yylineno, $5, $3);
-  $$ = make_let(yylineno, $1, e, $7);
-}
-| expr BUT ID IS expr { $$ = make_field_update(yylineno, $1, $3, $5); }
+| ID COLON expr SEMICOLON expr { $$ = make_let(yylineno, $1, $3, $5); }
+| expr PERIOD ID COLON expr { $$ = make_field_update(yylineno, $1, $3, $5); }
 ;
 %%
 int main(int argc, char* argv[])  { 

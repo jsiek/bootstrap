@@ -38,7 +38,7 @@ struct ValueS {
     char _char;
     char* str;
     struct { struct ValueS** data; int len; } array;
-    struct { TypeEnv* params; Term* body; Env* env; } proc;
+    struct { VarList* params; Term* body; Env* env; } proc;
     struct { Env* fields; } record;
     struct { char* name; struct ValueS* val; } variant;
     Handler* handler;
@@ -53,7 +53,7 @@ Value* make_int_value(int n);
 Value* make_bool_value(int b);
 Value* make_string_value(char* str);
 Value* make_char_value(char str);
-Value* make_procedure(TypeEnv* params, Term* body,Env* env);
+Value* make_procedure(VarList* params, Term* body,Env* env);
 Value* make_record_value(Env*);
 Value* make_variant_value(char* name, Value* val);
 Handler* make_handler(char* name, Value* fun, Handler* rest);
