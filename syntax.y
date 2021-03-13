@@ -107,7 +107,7 @@ input:
   if (v == 0) {
     printf("error during evaluation\n");
   } else {
-    print_value(v);
+    /*print_value(v);*/
     printf("\n");
   }
   }
@@ -165,6 +165,8 @@ expr:
 | expr MOD expr    { $$ = make_op(yylineno, Mod, insert_term($1, insert_term($3, 0))); }
 | NOT expr         { $$ = make_op(yylineno, Not, insert_term($2, 0)); }
 | MINUS expr       { $$ = make_op(yylineno, Neg, insert_term($2, 0)); }
+| WRITE expr       { $$ = make_op(yylineno, Write, insert_term($2, 0)); }
+| READ             { $$ = make_op(yylineno, Read, 0); }
 | RECORD fields    { $$ = make_record(yylineno, $2); }
 | TAG expr AS ID { $$ = make_variant(yylineno, $4, $2); }
 | TAG ID HANDLE expr { 

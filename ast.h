@@ -38,6 +38,7 @@ struct TermS {
     char* var;
     char* str;
     char _char;
+    struct TermS* write;
     struct { VarList* params; struct TermS* body; } lam;
     struct { struct TermS* rator; TermList* rands; } app;
     struct { TermList* inits; } array;

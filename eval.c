@@ -12,12 +12,12 @@ ValueList* insert_value(Value* v, ValueList* next) {
   return l;
 }
 
-Value* get_value(ValueList* vs, int i) {
+Value* get_nth(ValueList* vs, int i) {
   assert(vs);
   if (i == 0)
     return vs->value;
   else
-    return get_value(vs->next, i - 1);
+    return get_nth(vs->next, i - 1);
 }
 
 Value* make_unit_value() {
@@ -234,36 +234,65 @@ Value* eval(Term* e, Env* env, int depth) {
   }
   case Op: {
     ValueList* arg_vals = 0;
-    
     for (TermList* args = e->u.op.args; args != 0; args = args->next) {
       Value* v = eval(args->term, env, depth);
       arg_vals = insert_value(v, arg_vals);
     }
+    
     switch (e->u.op.tag) {
+    case Read: {
+      return make_char_value(getchar());
+    }
+    case Write: {
+      Value* v = get_nth(arg_vals, 0);
+      switch (v->tag) {
+      case CharV:
+	putchar(v->u._char);
+	break;
+      case IntV:
+	printf("%d", v->u._int);
+	break;
+      case StringV:
+	printf("%s", v->u.str);
+	break;
+      case BoolV:
+	if (v->u._bool == 0) {
+	  printf("false");
+	} else {
+	  printf("true");
+	}
+	break;
+      default:
+	printf("error, can't write ");
+	print_value(v);
+	exit(-1);
+      }
+      return make_unit_value();
+    }
     case Neg: {
-      Value* v = get_value(arg_vals, 0);
+      Value* v = get_nth(arg_vals, 0);
       assert (arg_vals && v->tag == IntV);
       return make_int_value(- v->u._int);
     }
     case Len: {
-      Value* v = get_value(arg_vals, 0);
+      Value* v = get_nth(arg_vals, 0);
       assert (arg_vals && v->tag == StringV);
       return make_int_value(strlen(v->u.str));
     }
     case Not: {
-      Value* v = get_value(arg_vals, 0);
+      Value* v = get_nth(arg_vals, 0);
       assert (arg_vals && v->tag == BoolV);
       return make_bool_value(! v->u._bool);
     }
     case And: {
-      Value* left = get_value(arg_vals, 0);
-      Value* right = get_value(arg_vals, 1);
+      Value* left = get_nth(arg_vals, 0);
+      Value* right = get_nth(arg_vals, 1);
       assert(left->tag == BoolV && right->tag == BoolV);
       return make_bool_value(left->u._bool && right->u._bool);
     }
     case Or: {
-      Value* left = get_value(arg_vals, 0);
-      Value* right = get_value(arg_vals, 1);
+      Value* left = get_nth(arg_vals, 0);
+      Value* right = get_nth(arg_vals, 1);
       if (left->tag == BoolV && right->tag == BoolV) {
 	return make_bool_value(left->u._bool || right->u._bool);
       } else if (left->tag == HandlerV && right->tag == HandlerV) {
@@ -278,8 +307,8 @@ Value* eval(Term* e, Env* env, int depth) {
       }
     }	
     case Equal: {
-      Value* left = get_value(arg_vals, 0);
-      Value* right = get_value(arg_vals, 1);
+      Value* left = get_nth(arg_vals, 0);
+      Value* right = get_nth(arg_vals, 1);
       if (left->tag == BoolV && right->tag == BoolV) {      
 	return make_bool_value(left->u._bool == right->u._bool);
       } else if (left->tag == IntV && right->tag == IntV) {
@@ -291,8 +320,8 @@ Value* eval(Term* e, Env* env, int depth) {
       }
     }
     case Add: {
-      Value* left = get_value(arg_vals, 0);
-      Value* right = get_value(arg_vals, 1);
+      Value* left = get_nth(arg_vals, 0);
+      Value* right = get_nth(arg_vals, 1);
       if (left->tag == IntV && right->tag == IntV) {      
 	return make_int_value(left->u._int + right->u._int);
       } else if (left->tag == CharV && right->tag == CharV) {
@@ -325,28 +354,28 @@ Value* eval(Term* e, Env* env, int depth) {
       }
     }
     case Sub: {
-      Value* left = get_value(arg_vals, 0);
-      Value* right = get_value(arg_vals, 1);
+      Value* left = get_nth(arg_vals, 0);
+      Value* right = get_nth(arg_vals, 1);
       return make_int_value(left->u._int - right->u._int);
     }
     case Mul: {
-      Value* left = get_value(arg_vals, 0);
-      Value* right = get_value(arg_vals, 1);
+      Value* left = get_nth(arg_vals, 0);
+      Value* right = get_nth(arg_vals, 1);
       return make_int_value(left->u._int * right->u._int);
     }
     case Div: {
-      Value* left = get_value(arg_vals, 0);
-      Value* right = get_value(arg_vals, 1);
+      Value* left = get_nth(arg_vals, 0);
+      Value* right = get_nth(arg_vals, 1);
       return make_int_value(left->u._int / right->u._int);
     }
     case Mod: {
-      Value* left = get_value(arg_vals, 0);
-      Value* right = get_value(arg_vals, 1);
+      Value* left = get_nth(arg_vals, 0);
+      Value* right = get_nth(arg_vals, 1);
       return make_int_value(left->u._int % right->u._int);
     }
     case Less: {
-      Value* left = get_value(arg_vals, 0);
-      Value* right = get_value(arg_vals, 1);
+      Value* left = get_nth(arg_vals, 0);
+      Value* right = get_nth(arg_vals, 1);
       return make_bool_value(left->u._int < right->u._int);
     }
     default:
