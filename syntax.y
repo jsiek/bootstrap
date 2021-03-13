@@ -16,7 +16,6 @@ void yyerror(char*s)  {
 extern int yylex();
 extern int yywrap();
 
-#include "typecheck.h"
 #include "eval.h"
 
 static Term* program;
@@ -25,12 +24,9 @@ static Term* program;
  {
    char* str;
    int  num;
-   Type* type;
-   TypeList* type_list;
    Term* term;
    TermList* term_list;
    TermBindingList* fields;
-   TypeEnv* field_types;
 };
 
 %token <num> INT
@@ -40,12 +36,7 @@ static Term* program;
 %type <term> expr
 %type <term_list> expr_list
 %type <term> simple_expr
-%type <type> type
-%type <type> simple_type
-%type <type_list> type_list
 %type <fields> fields
-%type <field_types> field_types
-%token ALL
 %token ARRAY
 %token NOT
 %token AND
@@ -53,7 +44,6 @@ static Term* program;
 %token FUN
 %token FOLD
 %token UNFOLD
-%token TYPE
 %token AT
 %token REC
 %token TRUE
@@ -69,7 +59,6 @@ static Term* program;
 %token IS
 %token PERIOD
 %token COMMA
-%token POSSES
 %token QUOTE
 %token TAG
 %token AS
@@ -121,14 +110,11 @@ input:
   /* empty */ { }
 | PERIOD { }
 | expr PERIOD {
-  Type* t = typecheck($1, 0, 0);
   Value* v = eval($1, 0, 0); 
   if (v == 0) {
     printf("error during evaluation\n");
   } else {
     print_value(v);
-    printf(" : ");
-    print_type(t);
     printf("\n");
   }
   }
@@ -140,42 +126,15 @@ line:
  }
 ;
 */
-field_types:
-  /* empty */ { $$ = 0; }
-| ID COLON type { $$ = make_type_binding($1, $3, 0); }
-| ID COLON type COMMA field_types { $$ = make_type_binding($1, $3, $5); }
-;
-type_list:
-  /* empty */ { $$ = 0; }
-| type { $$ = insert_type($1, 0); }
-| type COMMA type_list { $$ = insert_type($1, $3); }
-;
-simple_type:
-  ID                { $$ = make_var_type(yylineno, $1); }
-| INTTY             { $$ = make_int_type(yylineno); }
-| BOOLTY            { $$ = make_bool_type(yylineno); }
-| CHARTY            { $$ = make_char_type(yylineno); }
-| STRINGTY          { $$ = make_string_type(yylineno); }
-| UNITTY            { $$ = make_unit_type(yylineno); }
-| LP type RP { $$ = $2; }
-| LS type RS { $$ = make_array_type(yylineno, $2); }
-| simple_type LP type RP   { $$ = make_app_type(yylineno, $1, $3); }
-;
-type:
-  simple_type { $$ = $1; }
-| FUN LP ID RP type { $$ = make_lam_type(yylineno, $3, 0, $5); }
-| LP type_list RP FUNTY type   { $$ = make_fun_type(yylineno, $2, $5); }
-| type FUNTY type   { $$ = make_fun_type(yylineno, insert_type($1,0), $3); }
-| GROUP field_types { $$ = make_record_type(yylineno, $2); }
-| ONE OF field_types { $$ = make_variant_type(yylineno, $3); }
-| WITH TAG field_types HANDLE type { $$ = make_handler_type(yylineno, $3, $5); }
-| REC ID PERIOD type { $$ = make_recursive_type(yylineno, $2, $4); }
-| ALL ID PERIOD type { $$ = make_all_type(yylineno, $2, $4); }
-;
 fields:
   /* empty */ { $$ = 0; }
-| ID IS expr { $$ = make_binding($1, $3, 0); }
-| ID IS expr COMMA fields { $$ = make_binding($1, $3, $5); }
+| ID COLON expr { $$ = make_binding($1, $3, 0); }
+| ID COLON expr COMMA fields { $$ = make_binding($1, $3, $5); }
+;
+id_list:
+  /* empty */      { $$ = 0; }
+| ID               {}
+| ID COMMA id_list {}
 ;
 expr_list:
   /* empty */          { $$ = 0; }
@@ -183,14 +142,14 @@ expr_list:
 | expr COMMA expr_list { $$ = insert_term($1, $3); }
 ;
 simple_expr:
-  LP RP            { $$ = make_unit(yylineno); }
-| INT              { $$ = make_int(yylineno, $1); }
-| TRUE             { $$ = make_bool(yylineno, 1); }
-| FALSE            { $$ = make_bool(yylineno, 0); }
-| ID               { $$ = make_var(yylineno, $1); }
-| STR              { $$ = make_string(yylineno, $1); }
-| CHAR             { $$ = make_char(yylineno, $1[0]); }
-| FUN LP field_types RP LC expr RC { $$ = make_lambda(yylineno, $3, $6); }
+  LP RP             { $$ = make_unit(yylineno); }
+| INT               { $$ = make_int(yylineno, $1); }
+| TRUE              { $$ = make_bool(yylineno, 1); }
+| FALSE             { $$ = make_bool(yylineno, 0); }
+| ID                { $$ = make_var(yylineno, $1); }
+| STR               { $$ = make_string(yylineno, $1); }
+| CHAR              { $$ = make_char(yylineno, $1[0]); }
+| FUN id_list LC expr RC { $$ = make_lambda(yylineno, $2, $4); }
 | LP expr RP       { $$ = $2; }
 | LS expr_list RS { $$ = make_array(yylineno, $2); }
 | BAR expr BAR     { $$ = make_uniop(yylineno, Len, $2); }
@@ -237,9 +196,7 @@ expr:
   Term* e = make_ascribe(yylineno, $5, $3);
   $$ = make_let(yylineno, $1, e, $7);
 }
-| TYPE ID IS type PERIOD expr { $$ = make_alias(yylineno, $2, $4, $6); }
 | expr BUT ID IS expr { $$ = make_field_update(yylineno, $1, $3, $5); }
-| TRACE ID LP expr_list RP expr { $$ = make_trace(yylineno, $2, $4, $6); }
 ;
 %%
 int main(int argc, char* argv[])  { 

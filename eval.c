@@ -217,25 +217,6 @@ Value* eval(Term* e, Env* env, int depth) {
       return val;
     }
   }
-  case Ascribe: {
-    return eval(e->u.ascribe.term, env, depth);
-  }
-  case Trace: {
-    print_spaces(2 * depth);
-    printf("start %s(", e->u.trace.label);
-    ValueList* l = eval_list(e->u.trace.inputs, env, depth);
-    print_value_list(l);
-    printf("):\n");
-    Value* v = eval(e->u.trace.term, env, depth + 1);
-    /*
-    printf("return %s: ", e->u.trace.label);
-    print_value(v);
-    printf("\n");
-    */
-    print_spaces(2 * depth);
-    printf("end %s\n", e->u.trace.label); 
-    return v;
-  }
   case Array: {
     ValueList* vs = eval_list(e->u.array.inits, env, depth);
     return make_array_value(vs);
@@ -303,18 +284,6 @@ Value* eval(Term* e, Env* env, int depth) {
       exit(-1);
     }
   }
-  case Generic:
-    /*return make_procedure(0, e->u.generic.body, env);*/
-    return eval(e->u.generic.body, env, depth);
-  case Inst: {
-    Value* poly = eval(e->u.inst.poly, env, depth);
-    /*return apply(poly, 0);*/
-    return poly;
-  }
-  case Fold:
-    return eval(e->u.fold.body, env, depth);
-  case Unfold:
-    return eval(e->u.unfold.body, env, depth);
   case Lam: {
     return make_procedure(e->u.lam.params, e->u.lam.body, env);
   }
@@ -333,9 +302,6 @@ Value* eval(Term* e, Env* env, int depth) {
     Value* rhs = eval(e->u.let.rhs, env, depth);
     Env* env2 = make_env(e->u.let.var, rhs, env);
     return eval(e->u.let.body, env2, depth);
-  }
-  case Alias: {
-    return eval(e->u.alias.body, env, depth);
   }
   case UniOp: {
     Value* v = eval(e->u.uniop.expr, env, depth);
