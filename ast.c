@@ -182,6 +182,17 @@ void print_term_list(TermList* t) {
   }
 }
 
+void print_fields(TermBindingList* t) {
+  while (t != 0) {
+    printf("%s: ", t->field);
+    print_term(t->initializer);
+    if (t->rest) {
+      printf(", ");
+    }
+    t = t->rest;
+  }
+}
+
 void print_var_list(VarList* t) {
   while (t != 0) {
     printf("%s", t->var);
@@ -222,8 +233,54 @@ void print_term(Term* e) {
     print_var_list(e->u.lam.params);
     printf(") {...}");
     break;
-  default:
-    printf("<unknown term>");
+  case UnitTerm:
+    printf("()");
+    break;
+  case String:
+    printf("\"%s\"", e->u.str);
+    break;
+  case Char:
+    printf("#%c", e->u._char);
+    break;
+  case Recursive:
+    printf("rec (");
+    printf("%s", e->u.rec.var);
+    printf(") ");
+    print_term(e->u.rec.body);
+    break;
+  case Let:
+    printf("%s", e->u.let.var);
+    printf(": ");
+    print_term(e->u.let.body);
+    printf("; ");
+    break;
+  case Record:
+    printf("record {");
+    print_fields(e->u.record.fields);
+    printf("}");
+    break;
+  case Op:
+    printf("%s(", op_to_string(e->u.op.tag));
+    print_term_list(e->u.op.args);
+    printf(")");
+    break;
+  case FieldUpdate:
+    printf("<field update>");
+    break;
+  case Variant:
+    printf("(tag ");
+    print_term(e->u.variant.init);
+    printf(" as %s)", e->u.variant.name);
+    break;
+  case HandlerTerm:
+    printf("handler");
+    break;
+  case Case:
+    printf("case");
+    break;
+  case IfThen:
+    printf("if-then");
+    break;
   }
 }
 

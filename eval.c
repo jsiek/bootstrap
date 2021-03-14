@@ -145,7 +145,9 @@ Value* apply(Value* rator, ValueList* rands, int depth) {
   }
   default:
     printf("Error, attempt to call something that was not a function\n");
-    print_value(rator); exit(-1); return 0;
+    print_value(rator);
+    printf("\n");
+    exit(-1); return 0;
   }
 }
 
@@ -188,6 +190,7 @@ void print_spaces(int n) {
 }
 
 Value* eval(Term* e, Env* env, int depth) {
+  printf("eval "); print_term(e); printf("\n");
   if (depth > 10000) {
     fprintf(stdout, "procedure call stack too large, terminating\n");
     exit(-1);
@@ -469,16 +472,6 @@ Value* eval(Term* e, Env* env, int depth) {
 
 void print_value(Value* v) {
   switch (v->tag) {
-  case ArrayV:
-    printf("[");
-    for (int i = 0; i != v->u.array.len; ++i) {
-      print_value(v->u.array.data[i]);
-      if (i + 1 != v->u.array.len) {
-	printf(", ");
-      }
-    }
-    printf("]");
-    break;
   case UnitV:
     printf("()");
     break;
@@ -505,9 +498,9 @@ void print_value(Value* v) {
     printf("recursive function");
     break;
   case RecordV: {
-    printf("(group ");
+    printf("record {");
     print_env(v->u.record.fields);
-    printf(")");
+    printf("}");
     break;
   }
   case HandlerV:

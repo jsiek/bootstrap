@@ -79,7 +79,6 @@ static Term* program;
 %token THEN
 %token ELSE
 %token OF
-%token ONE
 %token WITH
 %token READ
 %token WRITE
@@ -94,15 +93,13 @@ static Term* program;
 %nonassoc EQUAL
 %left PLUS MINUS
 %left TIMES DIV
-%left POSSES
-%right FUNTY
 %nonassoc FUN TAG
 %start input
 %locations
 %%
 input:
   /* empty */ { }
-| expr PERIOD {
+| expr {
   Value* v = eval($1, 0, 0); 
   if (v == 0) {
     printf("error during evaluation\n");
@@ -142,7 +139,7 @@ simple_expr:
 | ID                { $$ = make_var(yylineno, $1); }
 | STR               { $$ = make_string(yylineno, $1); }
 | CHAR              { $$ = make_char(yylineno, $1[0]); }
-| FUN var_list LC expr RC { $$ = make_lambda(yylineno, $2, $4); }
+| FUN LP var_list RP LC expr RC { $$ = make_lambda(yylineno, $3, $6); }
 | LP expr RP       { $$ = $2; }
 | BAR expr BAR     { $$ = make_op(yylineno, Len, insert_term($2, 0)); }
 | simple_expr LP expr_list RP  { $$ = make_app(yylineno, $1, $3); }
@@ -167,7 +164,7 @@ expr:
 | MINUS expr       { $$ = make_op(yylineno, Neg, insert_term($2, 0)); }
 | WRITE expr       { $$ = make_op(yylineno, Write, insert_term($2, 0)); }
 | READ             { $$ = make_op(yylineno, Read, 0); }
-| RECORD fields    { $$ = make_record(yylineno, $2); }
+| RECORD LC fields RC    { $$ = make_record(yylineno, $3); }
 | TAG expr AS ID { $$ = make_variant(yylineno, $4, $2); }
 | TAG ID HANDLE expr { 
     $$ = make_handler_term(yylineno, $2, $4);

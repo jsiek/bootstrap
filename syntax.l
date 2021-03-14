@@ -16,6 +16,7 @@ RECORD  "record"
 TAG     "tag"
 WITH    "with"
 FUN     "fun"
+REC     "rec"
 TRUE    "true"
 FALSE   "false"
 IF      "if"
@@ -23,7 +24,6 @@ THEN    "then"
 ELSE    "else"
 CASE    "case"
 OF      "of"
-ONE     "one"
 BAR     "|"
 PLUS    "+"
 TIMES   "*"
@@ -42,6 +42,7 @@ LC      "{"
 RC      "}"
 LS      "["
 RS      "]"
+HANDLE  "=>"
 NL      [\n]
 INT     [0-9]+
 ID      [A-Za-z_][A-Za-z0-9_]*
@@ -50,6 +51,7 @@ CHAR    \#.
 COMMENT \/\/[^\n]*\n
 %%
 {FUN} { return FUN; }
+{REC} { return REC; }
 {MOD} { return MOD; }
 {NOT} { return NOT; }
 {AND} { return AND; }
@@ -65,7 +67,7 @@ COMMENT \/\/[^\n]*\n
 {ELSE} { return ELSE; }
 {CASE} { return CASE; }
 {OF} { return OF; }
-{ONE} { return ONE; }
+{HANDLE} { return HANDLE; }
 {BAR} { return BAR; }
 {TRUE} { return TRUE; }
 {FALSE} { return FALSE; }

@@ -6,7 +6,6 @@
 /***** Values and Environments *****/
 
 enum ValueKind { UnitV, IntV, BoolV, StringV, CharV,
-		 ArrayV,
 		 ProcV, FixV, RecordV, VariantV, HandlerV };
 struct ValueS;
 
