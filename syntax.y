@@ -25,9 +25,9 @@ static Term* program;
    char* str;
    int  num;
    Term* term;
-   TermList* term_list;
-   VarList* var_list;
-   TermBindingList* fields;
+   Value* term_list;
+   Value* var_list;
+   Value* fields;
 };
 
 %token <num> INT
@@ -37,9 +37,7 @@ static Term* program;
 %type <term> expr
 %type <term_list> expr_list
 %type <var_list> var_list
-%type <term> simple_expr
 %type <fields> fields
-%token ARRAY
 %token NOT
 %token AND
 %token OR
@@ -48,8 +46,10 @@ static Term* program;
 %token TRUE
 %token FALSE
 %token COLON
+%token COLON_COLON
 %token SEMICOLON
-%token IS
+%token HEAD
+%token TAIL
 %token PERIOD
 %token COMMA
 %token QUOTE
@@ -63,7 +63,6 @@ static Term* program;
 %token LS
 %token RS
 %token NL
-%token BUT
 %token PLUS
 %token TIMES
 %token MINUS
@@ -75,6 +74,7 @@ static Term* program;
 %token BAR
 %token CASE
 %token HANDLE
+%token LEFT_ARROW
 %token IF
 %token THEN
 %token ELSE
@@ -82,24 +82,29 @@ static Term* program;
 %token WITH
 %token READ
 %token WRITE
-%right PERIOD
-%nonassoc IS
-%left BUT
-%left BAR
+%nonassoc OF
+%nonassoc LC RC BAR 
 %nonassoc IF THEN ELSE
-%nonassoc LP RP
-%nonassoc LS RS LT GT 
 %left AND OR
+%nonassoc NOT WRITE
 %nonassoc EQUAL
+%nonassoc LT GT 
 %left PLUS MINUS
-%left TIMES DIV
-%nonassoc FUN TAG
+%left TIMES DIV MOD
+%right COLON_COLON
+%nonassoc HEAD TAIL
+%left PERIOD
+%nonassoc LP RP
+%nonassoc TAG HANDLE LEFT_ARROW
+%left SEMICOLON
 %start input
 %locations
 %%
-input:
-  /* empty */ { }
-| expr {
+input: expr {
+  printf("program:\n");
+  print_term($1);
+  printf("\n");
+  printf("------------------------\n");
   Value* v = eval($1, 0, 0); 
   if (v == 0) {
     printf("error during evaluation\n");
@@ -109,69 +114,68 @@ input:
   }
   }
 ;
-/*
-line: 
-  PERIOD
-| expr PERIOD {
- }
-;
-*/
 fields:
-  /* empty */ { $$ = 0; }
-| ID COLON expr { $$ = make_binding($1, $3, 0); }
-| ID COLON expr COMMA fields { $$ = make_binding($1, $3, $5); }
+  /* empty */ { $$ = make_unit(); }
+| ID COLON expr { $$ = make_list(make_string($1), $3); }
+| ID COLON expr COMMA fields { $$ = make_list(make_list(make_string($1), $3), $5); }
 ;
 var_list:
-  /* empty */      { $$ = 0; }
-| ID               { $$ = insert_var($1, 0); }
-| ID COMMA var_list { $$ = insert_var($1, $3); }
+  /* empty */      { $$ = make_unit(); }
+| ID               { $$ = make_list(make_string($1), make_unit()); }
+| ID COMMA var_list { $$ = make_list(make_string($1), $3); }
 ;
 expr_list:
-  /* empty */          { $$ = 0; }
-| expr                 { $$ = insert_term($1, 0); }
-| expr COMMA expr_list { $$ = insert_term($1, $3); }
-;
-simple_expr:
-  LP RP             { $$ = make_unit(yylineno); }
-| INT               { $$ = make_int(yylineno, $1); }
-| TRUE              { $$ = make_bool(yylineno, 1); }
-| FALSE             { $$ = make_bool(yylineno, 0); }
-| ID                { $$ = make_var(yylineno, $1); }
-| STR               { $$ = make_string(yylineno, $1); }
-| CHAR              { $$ = make_char(yylineno, $1[0]); }
-| FUN LP var_list RP LC expr RC { $$ = make_lambda(yylineno, $3, $6); }
-| LP expr RP       { $$ = $2; }
-| BAR expr BAR     { $$ = make_op(yylineno, Len, insert_term($2, 0)); }
-| simple_expr LP expr_list RP  { $$ = make_app(yylineno, $1, $3); }
-| expr PERIOD ID   { $$ = make_field_access(yylineno, $1, $3); }
+  /* empty */          { $$ = make_unit(); }
+| expr                 { $$ = make_list($1, make_unit()); }
+| expr COMMA expr_list { $$ = make_list($1, $3); }
 ;
 expr:
-  simple_expr      { $$ = $1; }
+  LP RP             { $$ = make_unit(); }
+| INT               { $$ = make_int($1); }
+| TRUE              { $$ = make_bool(1); }
+| FALSE             { $$ = make_bool(0); }
+| STR               { $$ = make_string($1); }
+| CHAR              { $$ = make_char($1[0]); }
+| ID                { $$ = make_var(yylineno, $1); }
+| HEAD expr         { $$ = make_op(yylineno, "head", make_list($2, make_unit())); }
+| TAIL expr         { $$ = make_op(yylineno, "tail", make_list($2, make_unit())); }
+| expr COLON_COLON expr
+    { $$ = make_op(yylineno, "make_list", make_list($1, make_list($3, make_unit()))); }
+| FUN LP var_list RP LC expr RC { $$ = make_lambda(yylineno, $3, $6); }
+| LP expr RP       { $$ = $2; }
+| BAR expr BAR     { $$ = make_op(yylineno, "length", make_list($2, make_unit())); }
+| expr LP expr_list RP  { $$ = make_app(yylineno, $1, $3); }
+| expr PERIOD ID   { $$ = make_field_access(yylineno, $1, $3); }
 | REC LP ID RP expr { $$ = make_recursive(yylineno, $3, $5); }
 | IF expr THEN expr ELSE expr { $$ = make_ifthen(yylineno, $2, $4, $6); }
-| expr EQUAL expr   { $$ = make_op(yylineno, Equal,
-				   insert_term($1, insert_term($3, 0))); }
-| expr PLUS expr   { $$ = make_op(yylineno, Add,
-				  insert_term($1, insert_term($3, 0))); }
-| expr MINUS expr  { $$ = make_op(yylineno, Sub, insert_term($1, insert_term($3, 0))); }
-| expr TIMES expr  { $$ = make_op(yylineno, Mul, insert_term($1, insert_term($3, 0))); }
-| expr DIV expr    { $$ = make_op(yylineno, Div, insert_term($1, insert_term($3, 0))); }
-| expr AND expr    { $$ = make_op(yylineno, And, insert_term($1, insert_term($3, 0))); }
-| expr OR expr    { $$ = make_op(yylineno, Or, insert_term($1, insert_term($3, 0))); }
-| expr LT expr    { $$ = make_op(yylineno, Less, insert_term($1, insert_term($3, 0))); }
-| expr MOD expr    { $$ = make_op(yylineno, Mod, insert_term($1, insert_term($3, 0))); }
-| NOT expr         { $$ = make_op(yylineno, Not, insert_term($2, 0)); }
-| MINUS expr       { $$ = make_op(yylineno, Neg, insert_term($2, 0)); }
-| WRITE expr       { $$ = make_op(yylineno, Write, insert_term($2, 0)); }
-| READ             { $$ = make_op(yylineno, Read, 0); }
+| expr EQUAL expr   { $$ = make_op(yylineno, "equal",
+				   make_list($1, make_list($3, make_unit()))); }
+| expr PLUS expr   { $$ = make_op(yylineno, "add",
+				  make_list($1, make_list($3, make_unit()))); }
+| expr MINUS expr  { $$ = make_op(yylineno, "sub", make_list($1, make_list($3, make_unit()))); }
+| expr TIMES expr  { $$ = make_op(yylineno, "mul", make_list($1, make_list($3, make_unit()))); }
+| expr DIV expr    { $$ = make_op(yylineno, "div", make_list($1, make_list($3, make_unit()))); }
+| expr AND expr    { $$ = make_op(yylineno, "and", make_list($1, make_list($3, make_unit()))); }
+| expr OR expr    { $$ = make_op(yylineno, "or", make_list($1, make_list($3, make_unit()))); }
+| expr LT expr    { $$ = make_op(yylineno, "less", make_list($1, make_list($3, make_unit()))); }
+| expr GT expr    { $$ = make_op(yylineno, "less", make_list($3, make_list($1, make_unit()))); }
+| expr MOD expr    { $$ = make_op(yylineno, "mod", make_list($1, make_list($3, make_unit()))); }
+| NOT expr         { $$ = make_op(yylineno, "not", make_list($2, make_unit())); }
+| MINUS expr       { $$ = make_op(yylineno, "neg", make_list($2, make_unit())); }
+| WRITE expr       { $$ = make_op(yylineno, "write", make_list($2, make_unit())); }
+| READ             { $$ = make_op(yylineno, "read", make_unit()); }
 | RECORD LC fields RC    { $$ = make_record(yylineno, $3); }
-| TAG expr AS ID { $$ = make_variant(yylineno, $4, $2); }
+| TAG expr AS ID { $$ = make_variant_term(yylineno, $4, $2); }
 | TAG ID HANDLE expr { 
     $$ = make_handler_term(yylineno, $2, $4);
   }
+| TAG ID COLON ID HANDLE expr { 
+    $$ = make_handler_term(yylineno, $2, make_lambda(yylineno,
+						     make_list(make_string($4), make_unit()), $6));
+  }
 | CASE expr OF expr { $$ = make_case(yylineno, $2, $4); }
 | ID COLON expr SEMICOLON expr { $$ = make_let(yylineno, $1, $3, $5); }
-| expr PERIOD ID COLON expr { $$ = make_field_update(yylineno, $1, $3, $5); }
+| expr PERIOD ID LEFT_ARROW expr { $$ = make_field_update(yylineno, $1, $3, $5); }
 ;
 %%
 int main(int argc, char* argv[])  { 

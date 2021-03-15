@@ -5,308 +5,198 @@
 
 /* Term Constructors */
 
-Term* make_unit(int lineno) {
-  Term* t = malloc(sizeof(Term));
-  t->tag = UnitTerm; 
-  t->lineno = lineno;
-  return t;
-}
-
-Term* make_int(int lineno, int n) {
-  Term* t = malloc(sizeof(Term));
-  t->tag = Int; 
-  t->lineno = lineno;
-  t->u._int = n;
-  return t;
-}
-
-Term* make_bool(int lineno, int n) {
-  Term* t = malloc(sizeof(Term));
-  t->tag = Bool; 
-  t->lineno = lineno;
-  t->u._int = n;
-  return t;
-}
-
-Term* make_char(int lineno, char c) {
-  Term* t = malloc(sizeof(Term));
-  t->tag = Char; 
-  t->lineno = lineno;
-  t->u._char = c;
-  return t;
-}
-
-Term* make_string(int lineno, char* c) {
-  Term* t = malloc(sizeof(Term));
-  t->tag = String; 
-  t->lineno = lineno;
-  t->u.str = malloc(strlen(c) + 1);
-  strcpy(t->u.str, c);
-  return t;
-}
-
 Term* make_var(int lineno, char* x) {
-  Term* t = malloc(sizeof(Term));
-  t->tag = Var; 
-  t->lineno = lineno;
-  t->u.var = x;
-  return t;
+  return make_variant("var", make_string(x));
 }
 
-Term* make_op(int lineno, enum OpKind tag, TermList* args) {
-  Term* t = malloc(sizeof(Term));
-  t->tag = Op; 
-  t->lineno = lineno;
-  t->u.op.tag = tag;
-  t->u.op.args = args;
-  return t;
+Term* make_op(int lineno, char* op, Value* args) {
+  Value* rec = make_record();
+  rec = record_set("line", make_int(lineno), rec);
+  rec = record_set("operator", make_string(op), rec);
+  rec = record_set("arguments", args, rec);
+  return make_variant("op", rec);
 }
 
 Term* make_ifthen(int lineno, Term* cond, Term* thn, Term* els) {
-  Term* t = malloc(sizeof(Term));
-  t->tag = IfThen; 
-  t->lineno = lineno;
-  t->u.ifthen.cond = cond;
-  t->u.ifthen.thn = thn;
-  t->u.ifthen.els = els;
-  return t;
+  Value* rec = make_record();
+  rec = record_set("line", make_int(lineno), rec);
+  rec = record_set("cond", cond, rec);
+  rec = record_set("then", thn, rec);
+  rec = record_set("else", els, rec);
+  return make_variant("ifthen", rec);
 }
 
-Term* make_lambda(int lineno, VarList* params, Term* body) {
-  Term* t = malloc(sizeof(Term));
-  t->tag = Lam; 
-  t->lineno = lineno;
-  t->u.lam.params = params;
-  t->u.lam.body = body;
-  return t;
+Term* make_lambda(int lineno, Value* params, Term* body) {
+  Value* rec = make_record();
+  rec = record_set("line", make_int(lineno), rec);
+  rec = record_set("params", params, rec);
+  rec = record_set("body", body, rec);
+  return make_variant("lambda", rec);
 }
 
-Term* make_app(int lineno, Term* rator, TermList* rands) {
-  Term* t = malloc(sizeof(Term));
-  t->tag = App; 
-  t->lineno = lineno;
-  t->u.app.rator = rator;
-  t->u.app.rands = rands;
-  return t;
+Term* make_app(int lineno, Term* rator, Value* rands) {
+  Value* rec = make_record();
+  rec = record_set("line", make_int(lineno), rec);
+  rec = record_set("rator", rator, rec);
+  rec = record_set("rands", rands, rec);
+  return make_variant("application", rec);
 }
 
 Term* make_recursive(int lineno, char* var, Term* body) {
-  Term* t = malloc(sizeof(Term));
-  t->tag = Recursive; 
-  t->lineno = lineno;
-  t->u.rec.var = var;
-  t->u.rec.body = body;
-  return t;
+  Value* rec = make_record();
+  rec = record_set("line", make_int(lineno), rec);
+  rec = record_set("var", make_string(var), rec);
+  rec = record_set("body", body, rec);
+  return make_variant("recursive", rec);
 }
 
 Term* make_let(int lineno, char* var, Term* rhs, Term* body) {
-  Term* t = malloc(sizeof(Term));
-  t->tag = Let; 
-  t->lineno = lineno;
-  t->u.let.var = var;
-  t->u.let.rhs = rhs;
-  t->u.let.body = body;
-  return t;
+  Value* rec = make_record();
+  rec = record_set("line", make_int(lineno), rec);
+  rec = record_set("var", make_string(var), rec);
+  rec = record_set("rhs", rhs, rec);
+  rec = record_set("body", body, rec);
+  return make_variant("let", rec);
 }
 
-TermBindingList* make_binding(char* field, Term* init, TermBindingList* rest)
-{
-  TermBindingList* l = malloc(sizeof(TermBindingList));
-  l->field = field;
-  l->initializer = init;
-  l->rest = rest;
-  return l;
+Term* make_record_term(int lineno, Value* fields) {
+  Value* rec = make_record();
+  rec = record_set("line", make_int(lineno), rec);
+  rec = record_set("fields", fields, rec);
+  return make_variant("record", rec);
 }
 
-Term* make_record(int lineno, TermBindingList* fields) {
-  Term* t = malloc(sizeof(Term));
-  t->tag = Record; 
-  t->lineno = lineno;
-  t->u.record.fields = fields;
-  return t;
+Term* make_field_access(int lineno, Term* record, char* field) {
+  Value* rec = make_record();
+  rec = record_set("line", make_int(lineno), rec);
+  rec = record_set("record", record, rec);
+  rec = record_set("field", make_string(field), rec);
+  return make_variant("get_field", rec);
 }
 
-Term* make_field_access(int lineno, Term* rec, char* field) {
-  Term* t = malloc(sizeof(Term));
-  t->tag = Field; 
-  t->lineno = lineno;
-  t->u.field_access.rec = rec;
-  t->u.field_access.field = field;
-  return t;
-}
-
-Term* make_field_update(int lineno, Term* rec, char* field, Term* replacement) {
-  Term* t = malloc(sizeof(Term));
-  t->tag = FieldUpdate; 
-  t->lineno = lineno;
-  t->u.field_update.rec = rec;
-  t->u.field_update.field = field;
-  t->u.field_update.replacement = replacement;
-  return t;
+Term* make_field_update(int lineno, Term* record, char* field, Term* replacement) {
+  Value* rec = make_record();
+  rec = record_set("line", make_int(lineno), rec);
+  rec = record_set("record", record, rec);
+  rec = record_set("field", make_string(field), rec);
+  rec = record_set("replacement", replacement, rec);
+  return make_variant("set_field", rec);
 }
 
 Term* make_case(int lineno, Term* descr, Term* handler) {
-  Term* t = malloc(sizeof(Term));
-  t->tag = Case; 
-  t->lineno = lineno;
-  t->u._case.descr = descr;
-  t->u._case.handler = handler;
-  return t;
+  Value* rec = make_record();
+  rec = record_set("line", make_int(lineno), rec);
+  rec = record_set("desc", descr, rec);
+  rec = record_set("handler", handler, rec);
+  return make_variant("case", rec);
 }
 
-Term* make_variant(int lineno, char* name, Term* init) {
-  Term* t = malloc(sizeof(Term));
-  t->tag = Variant; 
-  t->lineno = lineno;
-  t->u.variant.name = name;
-  t->u.variant.init = init;
-  return t;
+Term* make_variant_term(int lineno, char* name, Term* init) {
+  Value* rec = make_record();
+  rec = record_set("line", make_int(lineno), rec);
+  rec = record_set("name", make_string(name), rec);
+  rec = record_set("init", init, rec);
+  return make_variant("variant", rec);
 }
 
-Term* make_handler_term(int lineno, char* var, Term* body) {
-  Term* t = malloc(sizeof(Term));
-  t->tag = HandlerTerm; 
-  t->lineno = lineno;
-  t->u.handler.var = var;
-  t->u.handler.body = body;
-  return t;
+Term* make_handler_term(int lineno, char* name, Term* body) {
+  Value* rec = make_record();
+  rec = record_set("line", make_int(lineno), rec);
+  rec = record_set("name", make_string(name), rec);
+  rec = record_set("body", body, rec);
+  return make_variant("handler", rec);
 }
 
-void print_term_list(TermList* t) {
-  while (t != 0) {
-    print_term(t->term);
-    if (t->next) {
-      printf(", ");
-    }
-    t = t->next;
+void print_term_list(Term* e) {
+  if (! is_unit(e)) {
+    print_term(head(e));
+    if (! is_unit(tail(e)))
+      printf(" , ");
+    print_term_list(tail(e));
   }
 }
 
-void print_fields(TermBindingList* t) {
-  while (t != 0) {
-    printf("%s: ", t->field);
-    print_term(t->initializer);
-    if (t->rest) {
-      printf(", ");
-    }
-    t = t->rest;
-  }
-}
-
-void print_var_list(VarList* t) {
-  while (t != 0) {
-    printf("%s", t->var);
-    if (t->next) {
-      printf(", ");
-    }
-    t = t->next;
+void print_fields(Term* fs) {
+  if (! is_unit(fs)) {
+    Value* h = head(fs);
+    printf("%s: ", get_cstring(head(h)));
+    print_term(tail(h));
+    if (! is_unit(tail(fs)))
+      printf(" , ");
+    print_term_list(tail(fs));
   }
 }
 
 void print_term(Term* e) {
-  switch (e->tag) {
-  case Var:
-    printf("%s", e->u.var);
-    break;
-  case Int:
-    printf("%d", e->u._int);
-    break;
-  case Bool:
-    if (e->u._bool) {
-      printf("true");
-    } else {
-      printf("false");
-    }
-    break;
-  case Field:
-    print_term(e->u.field_access.rec);
-    printf("'s %s", e->u.field_access.field);
-    break;
-  case App:
-    print_term(e->u.app.rator);
+  if (is_unit(e))
+    printf("()");    
+  else if (is_int(e)) 
+    printf("%d", get_int(e));
+  else if (is_bool(e)) 
+    printf("%d", get_bool(e));
+  else if (is_string(e))
+    printf("\"%s\"", get_cstring(e));
+  else if (is_char(e))
+    printf("#%c", get_char(e));
+  else if (strcmp("var", variant_name(e))) {
+    printf("%s", get_cstring(variant_value(e)));
+  } else if (strcmp("get_field", variant_name(e))) {
+    print_term(record_get("record", variant_value(e)));
+    printf(".%s", get_cstring(record_get("field", variant_value(e))));
+  } else if (strcmp("application", variant_name(e))) {
+    print_term(record_get("rator", variant_value(e)));
     printf("(");
-    print_term_list(e->u.app.rands);
+    print_term_list(record_get("rands", variant_value(e)));
     printf(")");
-    break;
-  case Lam:
+  } else if (strcmp("lambda", variant_name(e))) {
     printf("fun (");
-    print_var_list(e->u.lam.params);
-    printf(") {...}");
-    break;
-  case UnitTerm:
-    printf("()");
-    break;
-  case String:
-    printf("\"%s\"", e->u.str);
-    break;
-  case Char:
-    printf("#%c", e->u._char);
-    break;
-  case Recursive:
+    print_term_list(record_get("params", variant_value(e)));
+    printf(") { ...}");
+  } else if (strcmp("recursive", variant_name(e))) {
     printf("rec (");
-    printf("%s", e->u.rec.var);
+    printf("%s", get_cstring(record_get("var", variant_value(e))));
     printf(") ");
-    print_term(e->u.rec.body);
-    break;
-  case Let:
-    printf("%s", e->u.let.var);
+    print_term(record_get("body", variant_value(e)));
+  } else if (strcmp("let", variant_name(e))) {
+    printf("%s", get_cstring(record_get("var", variant_value(e))));
     printf(": ");
-    print_term(e->u.let.body);
-    printf("; ");
-    break;
-  case Record:
+    print_term(record_get("rhs", variant_value(e)));
+    printf(";\n");
+    print_term(record_get("body", variant_value(e)));
+  } else if (strcmp("record", variant_name(e))) {
     printf("record {");
-    print_fields(e->u.record.fields);
+    print_fields(record_get("fields", variant_value(e)));
     printf("}");
-    break;
-  case Op:
-    printf("%s(", op_to_string(e->u.op.tag));
-    print_term_list(e->u.op.args);
+  } else if (strcmp("op", variant_name(e))) {
+    printf("%s(", get_cstring(record_get("operator", variant_value(e))));
+    print_term_list(record_get("arguments", variant_value(e)));
     printf(")");
-    break;
-  case FieldUpdate:
-    printf("<field update>");
-    break;
-  case Variant:
+  } else if (strcmp("set_field", variant_name(e))) {
+    print_term(record_get("record", variant_value(e)));
+    printf(".%s <- ", get_cstring(record_get("field", variant_value(e))));
+    print_term(record_get("replacement", variant_value(e)));
+  } else if (strcmp("variant", variant_name(e))) {
     printf("(tag ");
-    print_term(e->u.variant.init);
-    printf(" as %s)", e->u.variant.name);
-    break;
-  case HandlerTerm:
-    printf("handler");
-    break;
-  case Case:
-    printf("case");
-    break;
-  case IfThen:
-    printf("if-then");
-    break;
+    print_term(record_get("init", variant_value(e)));
+    printf(" as %s)", get_cstring(record_get("name", variant_value(e))));
+  } else if (strcmp("handler", variant_name(e))) {
+    printf("tag %s => ", get_cstring(record_get("name", variant_value(e))));
+    print_term(record_get("body", variant_value(e)));
+  } else if (strcmp("case", variant_name(e))) {
+    printf("case ");
+    print_term(record_get("descr", variant_value(e)));
+    printf(" of ");
+    print_term(record_get("handler", variant_value(e)));
+  } else if (strcmp("ifthen", variant_name(e))) {
+    printf("if ");
+    print_term(record_get("cond", variant_value(e)));
+    printf(" then ");
+    print_term(record_get("then", variant_value(e)));    
+    printf(" else ");
+    print_term(record_get("else", variant_value(e)));    
+  } else {
+    printf("error, unhandled case in print term\n");
+    exit(-1);
   }
 }
-
-static char* op_names[] = { "=", "+", "-", "*", "/", "and", "or", "<", "mod",
-                            "len", "not", "-" };
-
-char* op_to_string(enum OpKind binop) {
-  return op_names[binop];
-}
-
-/* lists */
-
-VarList* insert_var(char* t, VarList* next) {
-  VarList* l = malloc(sizeof(VarList));
-  l->var = t;
-  l->next = next;
-  return l;
-}
-
-TermList* insert_term(Term* t, TermList* next) {
-  TermList* l = malloc(sizeof(TermList));
-  l->term = t;
-  l->next = next;
-  return l;
-}
-
-
-
 

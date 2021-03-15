@@ -5,6 +5,8 @@
 %}
 %option yylineno
 
+HEAD    "head"
+TAIL    "tail"
 AS      "as"
 MOD     "mod"
 NOT     "not"
@@ -29,6 +31,7 @@ PLUS    "+"
 TIMES   "*"
 MINUS   "-"
 DIV     "/"
+COLON_COLON   "::"
 COLON   ":"
 SEMICOLON   ";"
 PERIOD  "."
@@ -43,6 +46,7 @@ RC      "}"
 LS      "["
 RS      "]"
 HANDLE  "=>"
+LEFT_ARROW "<-"
 NL      [\n]
 INT     [0-9]+
 ID      [A-Za-z_][A-Za-z0-9_]*
@@ -68,9 +72,13 @@ COMMENT \/\/[^\n]*\n
 {CASE} { return CASE; }
 {OF} { return OF; }
 {HANDLE} { return HANDLE; }
+{LEFT_ARROW} { return LEFT_ARROW; }
 {BAR} { return BAR; }
 {TRUE} { return TRUE; }
 {FALSE} { return FALSE; }
+{HEAD} { return HEAD; }
+{TAIL} { return TAIL; }
+{COLON_COLON} { return COLON_COLON; }
 {COLON} { return COLON; }
 {SEMICOLON} { return SEMICOLON; }
 {PERIOD} { return PERIOD; }

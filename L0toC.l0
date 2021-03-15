@@ -13,13 +13,16 @@ char_to_int: fun (c) {
 parse_integer: rec (recur) fun (c) {
   if is_digit(c) then
     next_c: read;
-    case recur(next_c) of
-      (tag none => fun (_) { tag 0 as none })
-    or (tag some => fun (_) { tag 1 as none })
+    case recur(next_c) of 
+       tag none: _ => tag (record {num: char_to_int(c), place: 1}) as some
+    or tag some: rest =>
+      place: 10 * rest.place;
+      tag record { num: char_to_int(c) * place + rest.num, place: place }
+      as some
   else
     tag () as none
   };
   
-case parse_integer(read) of
-  (tag none => fun(_) { () })
-or (tag some => fun(n) { write n })  
+case parse_integer(read) of 
+   tag none: _ => write "nothing"
+or tag some: r => write r.num
