@@ -2,15 +2,22 @@
 #include <stdio.h>
 #include <assert.h>
 #include "eval.h"
+#include "syntax.tab.h"
 
 extern char* input_filename;
+extern Term* program;
 
-int trace = 0;
+extern int yylex_init (yyscan_t* scanner);
+void yyset_in  ( FILE * _in_str , yyscan_t yyscanner );
+int yylex_destroy ( yyscan_t yyscanner );
+
+
+int trace = 1;
 
 Value* find_handler(char* name, Value* h) {
   if (is_unit(h)) {
     return 0;
-  } else if (strcmp(name, get_cstring(head(head(h)))) == 0) {
+  } else if (0 == strcmp(name, get_cstring(head(head(h))))) {
     return tail(head(h));
   } else {
     return find_handler(name, tail(h));
@@ -105,30 +112,47 @@ Value* eval_op(Term* e, Env* env, int depth) {
     arg_vals = make_list(v, arg_vals);
   }
   char* operator = get_cstring(record_get("operator", variant_value(e)));
-  if (strcmp("read", operator)) {
+  if (0 == strcmp("read", operator)) {
     return make_char(getchar());
-  } else if (strcmp("write", operator)) {
-    Value* v = get_nth(arg_vals, 0);
-    write_value(v);
+  } else if (0 == strcmp("write", operator)) {
+    Value* argument = get_nth(arg_vals, 0);
+    write_value(argument);
     return make_unit();
-  } else if (strcmp("neg", operator)) {
+  } else if (0 == strcmp("parse", operator)) {
+    yyscan_t scanner;
+    yylex_init(&scanner);
+    Value* argument = get_nth(arg_vals, 0);
+    char* file_name = get_cstring(argument);
+    FILE* file = fopen(file_name, "r");
+    if (!file) {
+      printf("error, could not open file \"%s\"\n", file_name);
+      exit(-1);
+    }
+    yyset_in(file, scanner);
+    yyparse(scanner);
+    yylex_destroy(scanner);
+    //printf("parsed program\n");
+    //print_term(program);
+    //printf("\n");
+    return program;
+  } else if (0 == strcmp("neg", operator)) {
     Value* v = get_nth(arg_vals, 0);
     assert (value_list_len(arg_vals) == 1 && is_int(v));
     return make_int(- get_int(v));
-  } else if (strcmp("length", operator)) {
+  } else if (0 == strcmp("length", operator)) {
     Value* v = get_nth(arg_vals, 0);
     assert (value_list_len(arg_vals) == 1 && is_string(v));
     return make_int(strlen(get_cstring(v)));
-  } else if (strcmp("not", operator)) {
+  } else if (0 == strcmp("not", operator)) {
     Value* v = get_nth(arg_vals, 0);
     assert (value_list_len(arg_vals) == 1 && is_bool(v));
     return make_bool(! v->u._bool);
-  } else if (strcmp("and", operator)) {
+  } else if (0 == strcmp("and", operator)) {
     Value* left = get_nth(arg_vals, 0);
     Value* right = get_nth(arg_vals, 1);
     assert(is_bool(left) && is_bool(right));
     return make_bool(get_bool(left) && get_bool(right));
-  } else if (strcmp("or", operator)) {
+  } else if (0 == strcmp("or", operator)) {
     Value* left = get_nth(arg_vals, 0);
     Value* right = get_nth(arg_vals, 1);
     if (is_bool(left) && is_bool(right)) {
@@ -143,7 +167,7 @@ Value* eval_op(Term* e, Env* env, int depth) {
       }
       return make_handler(r);
     }
-  } else if (strcmp("equal", operator)) {
+  } else if (0 == strcmp("equal", operator)) {
     Value* left = get_nth(arg_vals, 0);
     Value* right = get_nth(arg_vals, 1);
     if (is_bool(left) && is_bool(right)) {      
@@ -153,9 +177,9 @@ Value* eval_op(Term* e, Env* env, int depth) {
     } else if (is_char(left) && is_char(right)) {
       return make_bool(get_char(left) == get_char(right));
     } else if (is_string(left) && is_string(right)) {
-      return make_bool(strcmp(get_cstring(left), get_cstring(right)) == 0);
+      return make_bool(0 == strcmp(get_cstring(left), get_cstring(right)));
     }
-  } else if (strcmp("add", operator)) {
+  } else if (0 == strcmp("add", operator)) {
     Value* left = get_nth(arg_vals, 0);
     Value* right = get_nth(arg_vals, 1);
     if (is_int(left) && is_int(right)) {      
@@ -191,7 +215,7 @@ Value* eval_op(Term* e, Env* env, int depth) {
       printf("error in addition\n");
       exit(-1);
     }
-  } else if (strcmp("sub", operator)) {
+  } else if (0 == strcmp("sub", operator)) {
     Value* left = get_nth(arg_vals, 0);
     Value* right = get_nth(arg_vals, 1);
     if (is_int(left) && is_int(right)) {      
@@ -200,7 +224,7 @@ Value* eval_op(Term* e, Env* env, int depth) {
       printf("error in subtraction\n");
       exit(-1);
     }
-  } else if (strcmp("mul", operator)) {
+  } else if (0 == strcmp("mul", operator)) {
     Value* left = get_nth(arg_vals, 0);
     Value* right = get_nth(arg_vals, 1);
     if (is_int(left) && is_int(right)) {      
@@ -209,7 +233,7 @@ Value* eval_op(Term* e, Env* env, int depth) {
       printf("error in multiplication\n");
       exit(-1);
     }
-  } else if (strcmp("div", operator)) {
+  } else if (0 == strcmp("div", operator)) {
     Value* left = get_nth(arg_vals, 0);
     Value* right = get_nth(arg_vals, 1);
     if (is_int(left) && is_int(right)) {      
@@ -218,7 +242,7 @@ Value* eval_op(Term* e, Env* env, int depth) {
       printf("error in division\n");
       exit(-1);
     }
-  } else if (strcmp("mod", operator)) {
+  } else if (0 == strcmp("mod", operator)) {
     Value* left = get_nth(arg_vals, 0);
     Value* right = get_nth(arg_vals, 1);
     if (is_int(left) && is_int(right)) {
@@ -227,7 +251,7 @@ Value* eval_op(Term* e, Env* env, int depth) {
       printf("error in modulo\n");
       exit(-1);
     }
-  } else if (strcmp("less", operator)) {
+  } else if (0 == strcmp("less", operator)) {
     Value* left = get_nth(arg_vals, 0);
     Value* right = get_nth(arg_vals, 1);
     if (is_int(left) && is_int(right)) {
@@ -236,11 +260,11 @@ Value* eval_op(Term* e, Env* env, int depth) {
       printf("error in less than\n");
       exit(-1);
     }
-  } else if (strcmp("head", operator)) {
+  } else if (0 == strcmp("head", operator)) {
     return head(get_nth(arg_vals, 0));
-  } else if (strcmp("tail", operator)) {
+  } else if (0 == strcmp("tail", operator)) {
     return tail(get_nth(arg_vals, 0));
-  } else if (strcmp("make_list", operator)) {
+  } else if (0 == strcmp("make_list", operator)) {
     return make_list(get_nth(arg_vals, 0), get_nth(arg_vals, 1));
   } else {
     fprintf(stderr, "%s:%d: Error: operator %s is not applicable to ",
@@ -271,7 +295,7 @@ Value* eval(Term* e, Env* env, int depth) {
     result = e;
   } else if (is_bool(e)) {
     result = e;
-  } else if (strcmp("var", variant_name(e))) {
+  } else if (0 == strcmp("var", variant_name(e))) {
     char* name = get_cstring(variant_value(e));
     Value* val = lookup(name, env);
     if (val == 0) {
@@ -280,26 +304,26 @@ Value* eval(Term* e, Env* env, int depth) {
     } else {
       result = val;
     }
-  } else if (strcmp("lamba", variant_name(e))) {
+  } else if (0 == strcmp("lambda", variant_name(e))) {
     result = make_procedure(record_get("params", variant_value(e)),
 			    record_get("body", variant_value(e)),
 			    env);
-  } else if (strcmp("application", variant_name(e))) {
+  } else if (0 == strcmp("application", variant_name(e))) {
     Value* rator = eval(record_get("rator", variant_value(e)), env, depth + 1);
     Value* rands = eval_list(record_get("rands", variant_value(e)), env, depth + 1);
     result = apply(rator, rands, depth);
-  } else if (strcmp("recursive", variant_name(e))) {
+  } else if (0 == strcmp("recursive", variant_name(e))) {
     Env* env2 = make_env(get_cstring(record_get("var", variant_value(e))), 0, env);
     Value* v = eval(record_get("body", variant_value(e)), env2, depth + 1);
     set_tail(head(env2), v);
     result = v;
-  } else if (strcmp("let", variant_name(e))) {
+  } else if (0 == strcmp("let", variant_name(e))) {
     Value* rhs = eval(record_get("rhs", variant_value(e)), env, depth + 1);
     Env* env2 = make_env(get_cstring(record_get("var", variant_value(e))), rhs, env);
     result = eval(record_get("body", variant_value(e)), env2, depth + 1);
-  } else if (strcmp("op", variant_name(e))) {
+  } else if (0 == strcmp("op", variant_name(e))) {
     result = eval_op(e, env, depth);
-  } else if (strcmp("ifthen", variant_name(e))) {
+  } else if (0 == strcmp("ifthen", variant_name(e))) {
     Value* cond = eval(record_get("cond", variant_value(e)), env, depth + 1);
     if (is_bool(cond)) {
       if (get_bool(cond)) {
@@ -313,11 +337,11 @@ Value* eval(Term* e, Env* env, int depth) {
       printf("\n");
       exit(-1);
     }
-  } else if (strcmp("record", variant_name(e))) {
+  } else if (0 == strcmp("record", variant_name(e))) {
     Value* l = record_get("fields", variant_value(e));
     Env* fields = eval_term_bindings(l, env, depth);
     result = make_record(fields);
-  } else if (strcmp("get_field", variant_name(e))) {
+  } else if (0 == strcmp("get_field", variant_name(e))) {
     Value* rec = eval(record_get("record", variant_value(e)), env, depth + 1);
     if (is_record(rec)) {
       char* field = get_cstring(record_get("field", variant_value(e)));
@@ -336,7 +360,7 @@ Value* eval(Term* e, Env* env, int depth) {
       printf("\n");
       exit(-1); 
     }
-  } else if (strcmp("set_field", variant_name(e))) {
+  } else if (0 == strcmp("set_field", variant_name(e))) {
     Value* rec = eval(record_get("record", variant_value(e)), env, depth + 1);
     Value* replacement = eval(record_get("replacement", variant_value(e)), env, depth + 1);
     if (is_record(rec)) {
@@ -349,15 +373,15 @@ Value* eval(Term* e, Env* env, int depth) {
       printf("\n");
       exit(-1); 
     }
-  } else if (strcmp("variant", variant_name(e))) {
+  } else if (0 == strcmp("variant", variant_name(e))) {
     Value* val = eval(record_get("init", variant_value(e)), env, depth + 1);
     char* name = get_cstring(record_get("name", variant_value(e)));
     result = make_variant(name, val);
-  } else if (strcmp("handler", variant_name(e))) {
+  } else if (0 == strcmp("handler", variant_name(e))) {
     Value* fun = eval(record_get("body", variant_value(e)), env, depth + 1);
     result = make_handler(make_list(make_list(record_get("name", variant_value(e)), fun),
 				    make_unit()));
-  } else if (strcmp("case", variant_name(e))) {
+  } else if (0 == strcmp("case", variant_name(e))) {
     Value* descr = eval(record_get("descr", variant_value(e)), env, depth + 1);
     Value* handler = eval(record_get("handler", variant_value(e)), env, depth + 1);
     switch (descr->tag) {

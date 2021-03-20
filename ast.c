@@ -86,7 +86,7 @@ Term* make_field_update(int lineno, Term* record, char* field, Term* replacement
 Term* make_case(int lineno, Term* descr, Term* handler) {
   Value* rec = make_record();
   rec = record_set("line", make_int(lineno), rec);
-  rec = record_set("desc", descr, rec);
+  rec = record_set("descr", descr, rec);
   rec = record_set("handler", handler, rec);
   return make_variant("case", rec);
 }
@@ -138,56 +138,56 @@ void print_term(Term* e) {
     printf("\"%s\"", get_cstring(e));
   else if (is_char(e))
     printf("#%c", get_char(e));
-  else if (strcmp("var", variant_name(e))) {
+  else if (0 == strcmp("var", variant_name(e))) {
     printf("%s", get_cstring(variant_value(e)));
-  } else if (strcmp("get_field", variant_name(e))) {
+  } else if (0 == strcmp("get_field", variant_name(e))) {
     print_term(record_get("record", variant_value(e)));
     printf(".%s", get_cstring(record_get("field", variant_value(e))));
-  } else if (strcmp("application", variant_name(e))) {
+  } else if (0 == strcmp("application", variant_name(e))) {
     print_term(record_get("rator", variant_value(e)));
     printf("(");
     print_term_list(record_get("rands", variant_value(e)));
     printf(")");
-  } else if (strcmp("lambda", variant_name(e))) {
+  } else if (0 == strcmp("lambda", variant_name(e))) {
     printf("fun (");
     print_term_list(record_get("params", variant_value(e)));
     printf(") { ...}");
-  } else if (strcmp("recursive", variant_name(e))) {
+  } else if (0 == strcmp("recursive", variant_name(e))) {
     printf("rec (");
     printf("%s", get_cstring(record_get("var", variant_value(e))));
     printf(") ");
     print_term(record_get("body", variant_value(e)));
-  } else if (strcmp("let", variant_name(e))) {
+  } else if (0 == strcmp("let", variant_name(e))) {
     printf("%s", get_cstring(record_get("var", variant_value(e))));
     printf(": ");
     print_term(record_get("rhs", variant_value(e)));
     printf(";\n");
     print_term(record_get("body", variant_value(e)));
-  } else if (strcmp("record", variant_name(e))) {
+  } else if (0 == strcmp("record", variant_name(e))) {
     printf("record {");
     print_fields(record_get("fields", variant_value(e)));
     printf("}");
-  } else if (strcmp("op", variant_name(e))) {
+  } else if (0 == strcmp("op", variant_name(e))) {
     printf("%s(", get_cstring(record_get("operator", variant_value(e))));
     print_term_list(record_get("arguments", variant_value(e)));
     printf(")");
-  } else if (strcmp("set_field", variant_name(e))) {
+  } else if (0 == strcmp("set_field", variant_name(e))) {
     print_term(record_get("record", variant_value(e)));
     printf(".%s <- ", get_cstring(record_get("field", variant_value(e))));
     print_term(record_get("replacement", variant_value(e)));
-  } else if (strcmp("variant", variant_name(e))) {
+  } else if (0 == strcmp("variant", variant_name(e))) {
     printf("(tag ");
     print_term(record_get("init", variant_value(e)));
     printf(" as %s)", get_cstring(record_get("name", variant_value(e))));
-  } else if (strcmp("handler", variant_name(e))) {
+  } else if (0 == strcmp("handler", variant_name(e))) {
     printf("tag %s => ", get_cstring(record_get("name", variant_value(e))));
     print_term(record_get("body", variant_value(e)));
-  } else if (strcmp("case", variant_name(e))) {
+  } else if (0 == strcmp("case", variant_name(e))) {
     printf("case ");
     print_term(record_get("descr", variant_value(e)));
     printf(" of ");
     print_term(record_get("handler", variant_value(e)));
-  } else if (strcmp("ifthen", variant_name(e))) {
+  } else if (0 == strcmp("ifthen", variant_name(e))) {
     printf("if ");
     print_term(record_get("cond", variant_value(e)));
     printf(" then ");

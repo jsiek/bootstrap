@@ -1,0 +1,2 @@
+case (parse "test/zero.l0") of
+  (tag op : ast => write (ast.operator))

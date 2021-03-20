@@ -3,7 +3,7 @@
 #include "ast.h"
 #include "syntax.tab.h"
 %}
-%option yylineno
+%option yylineno reentrant bison-bridge bison-locations
 
 HEAD    "head"
 TAIL    "tail"
@@ -14,6 +14,7 @@ AND     "and"
 OR      "or"
 READ    "read"
 WRITE   "write"
+PARSE   "parse"
 RECORD  "record"
 TAG     "tag"
 WITH    "with"
@@ -62,6 +63,7 @@ COMMENT \/\/[^\n]*\n
 {OR} { return OR; }
 {READ} { return READ; }
 {WRITE} { return WRITE; }
+{PARSE} { return PARSE; }
 {RECORD} { return RECORD; }
 {TAG} { return TAG; }
 {AS} { return AS; }
@@ -98,23 +100,23 @@ COMMENT \/\/[^\n]*\n
 {RS}     { return RS; }
 {ID}     {
            int n = strlen(yytext);
-           yylval.str = (char*)malloc((n + 1) * sizeof(char));
-           strncpy(yylval.str, yytext, n + 1);
+           yylval->str = (char*)malloc((n + 1) * sizeof(char));
+           strncpy(yylval->str, yytext, n + 1);
            return ID;
          }
-{INT}    {yylval.num = atof(yytext);  return INT;}
+{INT}    {yylval->num = atof(yytext);  return INT;}
 {STR}     {
            int n = strlen(yytext) - 2;
-           yylval.str = (char*)malloc((n + 1) * sizeof(char));
-           strncpy(yylval.str, yytext+1, n + 1);
-           yylval.str[n] = 0;
+           yylval->str = (char*)malloc((n + 1) * sizeof(char));
+           strncpy(yylval->str, yytext+1, n + 1);
+           yylval->str[n] = 0;
            return STR;
          }
 {CHAR}     {
            int n = strlen(yytext) - 1;
-           yylval.str = (char*)malloc((n + 1) * sizeof(char));
-           strncpy(yylval.str, yytext+1, n + 1);
-           yylval.str[n] = 0;
+           yylval->str = (char*)malloc((n + 1) * sizeof(char));
+           strncpy(yylval->str, yytext+1, n + 1);
+           yylval->str[n] = 0;
            return CHAR;
          }
 [ \t\n]+   ;

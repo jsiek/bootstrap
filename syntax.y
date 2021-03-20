@@ -1,24 +1,27 @@
+%define api.pure full
+%param { yyscan_t scanner }
+%code top {
+  #include <stdio.h>
+  #include "eval.h"
+}
+%code requires {
+  typedef void* yyscan_t;
+}
+%code {
+  int yylex(YYSTYPE* yylvalp, YYLTYPE* yyllocp, yyscan_t scanner);
+  void yyerror(YYLTYPE* yyllocp, yyscan_t unused, const char* msg);
+}
 %{
 #include <stdlib.h>
-#include <stdio.h>
 #include <stdarg.h>
 
-extern FILE* yyin;
-extern int yylineno;
+  //extern FILE* yyin;
+  //extern int yylineno;
 char* input_filename;
 
-void yyerror(char*s)  {
-  fprintf(stderr, "%s:%d: %s\n", input_filename, yylineno, s);
-  exit(-1);
-}
-// void yyerror(char *s, ...);
+  //extern int yywrap();
 
-extern int yylex();
-extern int yywrap();
-
-#include "eval.h"
-
-static Term* program;
+Term* program;
 %}
 %union
  {
@@ -29,6 +32,13 @@ static Term* program;
    Value* var_list;
    Value* fields;
 };
+
+%{
+  void yyerror(YYLTYPE* yyllocp, yyscan_t unused, const char* msg)  {
+    fprintf(stderr, "%s:%d:%d: %s\n", input_filename, yyllocp->first_line, yyllocp->first_column, msg);
+    exit(-1);
+  }
+%}
 
 %token <num> INT
 %token <str> ID
@@ -82,11 +92,12 @@ static Term* program;
 %token WITH
 %token READ
 %token WRITE
+%token PARSE
 %nonassoc OF
 %nonassoc LC RC BAR 
 %nonassoc IF THEN ELSE
 %left AND OR
-%nonassoc NOT WRITE
+%nonassoc NOT WRITE PARSE
 %nonassoc EQUAL
 %nonassoc LT GT 
 %left PLUS MINUS
@@ -101,6 +112,7 @@ static Term* program;
 %locations
 %%
 input: expr {
+#if 0
   printf("program:\n");
   print_term($1);
   printf("\n");
@@ -112,6 +124,9 @@ input: expr {
     /*print_value(v);*/
     printf("\n");
   }
+#else
+  program = $1;
+#endif  
   }
 ;
 fields:
@@ -136,62 +151,49 @@ expr:
 | FALSE             { $$ = make_bool(0); }
 | STR               { $$ = make_string($1); }
 | CHAR              { $$ = make_char($1[0]); }
-| ID                { $$ = make_var(yylineno, $1); }
-| HEAD expr         { $$ = make_op(yylineno, "head", make_list($2, make_unit())); }
-| TAIL expr         { $$ = make_op(yylineno, "tail", make_list($2, make_unit())); }
+| ID                { $$ = make_var(yylloc.first_line, $1); }
+| HEAD expr         { $$ = make_op(yylloc.first_line, "head", make_list($2, make_unit())); }
+| TAIL expr         { $$ = make_op(yylloc.first_line, "tail", make_list($2, make_unit())); }
 | expr COLON_COLON expr
-    { $$ = make_op(yylineno, "make_list", make_list($1, make_list($3, make_unit()))); }
-| FUN LP var_list RP LC expr RC { $$ = make_lambda(yylineno, $3, $6); }
+    { $$ = make_op(yylloc.first_line, "make_list", make_list($1, make_list($3, make_unit()))); }
+| FUN LP var_list RP LC expr RC { $$ = make_lambda(yylloc.first_line, $3, $6); }
 | LP expr RP       { $$ = $2; }
-| BAR expr BAR     { $$ = make_op(yylineno, "length", make_list($2, make_unit())); }
-| expr LP expr_list RP  { $$ = make_app(yylineno, $1, $3); }
-| expr PERIOD ID   { $$ = make_field_access(yylineno, $1, $3); }
-| REC LP ID RP expr { $$ = make_recursive(yylineno, $3, $5); }
-| IF expr THEN expr ELSE expr { $$ = make_ifthen(yylineno, $2, $4, $6); }
-| expr EQUAL expr   { $$ = make_op(yylineno, "equal",
+| BAR expr BAR     { $$ = make_op(yylloc.first_line, "length", make_list($2, make_unit())); }
+| expr LP expr_list RP  { $$ = make_app(yylloc.first_line, $1, $3); }
+| expr PERIOD ID   { $$ = make_field_access(yylloc.first_line, $1, $3); }
+| REC LP ID RP expr { $$ = make_recursive(yylloc.first_line, $3, $5); }
+| IF expr THEN expr ELSE expr { $$ = make_ifthen(yylloc.first_line, $2, $4, $6); }
+| expr EQUAL expr   { $$ = make_op(yylloc.first_line, "equal",
 				   make_list($1, make_list($3, make_unit()))); }
-| expr PLUS expr   { $$ = make_op(yylineno, "add",
+| expr PLUS expr   { $$ = make_op(yylloc.first_line, "add",
 				  make_list($1, make_list($3, make_unit()))); }
-| expr MINUS expr  { $$ = make_op(yylineno, "sub", make_list($1, make_list($3, make_unit()))); }
-| expr TIMES expr  { $$ = make_op(yylineno, "mul", make_list($1, make_list($3, make_unit()))); }
-| expr DIV expr    { $$ = make_op(yylineno, "div", make_list($1, make_list($3, make_unit()))); }
-| expr AND expr    { $$ = make_op(yylineno, "and", make_list($1, make_list($3, make_unit()))); }
-| expr OR expr    { $$ = make_op(yylineno, "or", make_list($1, make_list($3, make_unit()))); }
-| expr LT expr    { $$ = make_op(yylineno, "less", make_list($1, make_list($3, make_unit()))); }
-| expr GT expr    { $$ = make_op(yylineno, "less", make_list($3, make_list($1, make_unit()))); }
-| expr MOD expr    { $$ = make_op(yylineno, "mod", make_list($1, make_list($3, make_unit()))); }
-| NOT expr         { $$ = make_op(yylineno, "not", make_list($2, make_unit())); }
-| MINUS expr       { $$ = make_op(yylineno, "neg", make_list($2, make_unit())); }
-| WRITE expr       { $$ = make_op(yylineno, "write", make_list($2, make_unit())); }
-| READ             { $$ = make_op(yylineno, "read", make_unit()); }
-| RECORD LC fields RC    { $$ = make_record(yylineno, $3); }
-| TAG expr AS ID { $$ = make_variant_term(yylineno, $4, $2); }
+| expr MINUS expr  { $$ = make_op(yylloc.first_line, "sub", make_list($1, make_list($3, make_unit()))); }
+| expr TIMES expr  { $$ = make_op(yylloc.first_line, "mul", make_list($1, make_list($3, make_unit()))); }
+| expr DIV expr    { $$ = make_op(yylloc.first_line, "div", make_list($1, make_list($3, make_unit()))); }
+| expr AND expr    { $$ = make_op(yylloc.first_line, "and", make_list($1, make_list($3, make_unit()))); }
+| expr OR expr    { $$ = make_op(yylloc.first_line, "or", make_list($1, make_list($3, make_unit()))); }
+| expr LT expr    { $$ = make_op(yylloc.first_line, "less", make_list($1, make_list($3, make_unit()))); }
+| expr GT expr    { $$ = make_op(yylloc.first_line, "less", make_list($3, make_list($1, make_unit()))); }
+| expr MOD expr    { $$ = make_op(yylloc.first_line, "mod", make_list($1, make_list($3, make_unit()))); }
+| NOT expr         { $$ = make_op(yylloc.first_line, "not", make_list($2, make_unit())); }
+| MINUS expr       { $$ = make_op(yylloc.first_line, "neg", make_list($2, make_unit())); }
+| WRITE expr       { $$ = make_op(yylloc.first_line, "write", make_list($2, make_unit())); }
+| PARSE STR        { $$ = make_op(yylloc.first_line, "parse", make_list(make_string($2), make_unit())); }
+| READ             { $$ = make_op(yylloc.first_line, "read", make_unit()); }
+| RECORD LC fields RC    { $$ = make_record(yylloc.first_line, $3); }
+| TAG expr AS ID { $$ = make_variant_term(yylloc.first_line, $4, $2); }
 | TAG ID HANDLE expr { 
-    $$ = make_handler_term(yylineno, $2, $4);
+    $$ = make_handler_term(yylloc.first_line, $2, $4);
   }
 | TAG ID COLON ID HANDLE expr { 
-    $$ = make_handler_term(yylineno, $2, make_lambda(yylineno,
+    $$ = make_handler_term(yylloc.first_line, $2, make_lambda(yylloc.first_line,
 						     make_list(make_string($4), make_unit()), $6));
   }
-| CASE expr OF expr { $$ = make_case(yylineno, $2, $4); }
-| ID COLON expr SEMICOLON expr { $$ = make_let(yylineno, $1, $3, $5); }
-| expr PERIOD ID LEFT_ARROW expr { $$ = make_field_update(yylineno, $1, $3, $5); }
+| CASE expr OF expr { $$ = make_case(yylloc.first_line, $2, $4); }
+| ID COLON expr SEMICOLON expr { $$ = make_let(yylloc.first_line, $1, $3, $5); }
+| expr PERIOD ID LEFT_ARROW expr { $$ = make_field_update(yylloc.first_line, $1, $3, $5); }
 ;
 %%
-int main(int argc, char* argv[])  { 
-  /*yydebug = 1;*/
-
-  if (argc > 1) {
-    input_filename = argv[1];
-    yyin = fopen(argv[1], "r");
-  }
-  if (argc > 2) {
-    FILE* program = fopen(argv[2], "r");
-    input = read_file(program);
-  }
-  yyparse(); 
-  return 0;
-}
 
 /*
 void yyerror(char *s, ...)

@@ -117,7 +117,9 @@ char* get_cstring(Value* v) {
   case StringV:
     return v->u.str;
   default:
-    printf("error in get_cstring, expected a string\n");
+    printf("error in get_cstring, expected a string, not\n");
+    print_value(v);
+    printf("\n");
     exit(-1);
   }
 }
@@ -196,12 +198,13 @@ Value* record_get(char* field, Value* record) {
   case RecordV: {
     Value* fields = record->u.record.fields;
     while (! is_unit(fields)) {
-      if (strcmp(field, get_cstring(head(head(fields)))))
+      if (0 == strcmp(field, get_cstring(head(head(fields)))))
 	return tail(head(fields));
       else
 	fields = tail(fields);
     }
-    return 0;
+    printf("error in record get, could not find field %s\n", field);
+    exit(-1);
   }
   default:
     printf("error in record get, expected record\n");
@@ -285,7 +288,7 @@ void print_env(Env* env) {
 Value* lookup(char* var, Value* env) {
   if (is_unit(env))
     return 0;
-  else if (strcmp(var, get_cstring(head(head(env)))))
+  else if (0 == strcmp(var, get_cstring(head(head(env)))))
     return tail(head(env));
   else
     return lookup(var, tail(env));
@@ -333,9 +336,10 @@ void print_value(Value* v) {
     printf(" as %s", v->u.variant.name);
     printf(")");
     break;
-  default:
-    printf("unknown value");
-    break;
+  case ListV:
+    print_value(v->u.list.head);
+    printf(" :: ");
+    print_value(v->u.list.tail);
   }
 }
 
