@@ -92,12 +92,14 @@ Term* program;
 %token WITH
 %token READ
 %token WRITE
+%token STRING_OF
 %token PARSE
 %nonassoc OF
-%nonassoc LC RC BAR 
+%nonassoc LC RC BAR
+%nonassoc HANDLE
 %nonassoc IF THEN ELSE
 %left AND OR
-%nonassoc NOT WRITE PARSE
+%nonassoc NOT WRITE STRING_OF PARSE
 %nonassoc EQUAL
 %nonassoc LT GT 
 %left PLUS MINUS
@@ -106,28 +108,12 @@ Term* program;
 %nonassoc HEAD TAIL
 %left PERIOD
 %nonassoc LP RP
-%nonassoc TAG HANDLE LEFT_ARROW
+%nonassoc TAG LEFT_ARROW
 %left SEMICOLON
 %start input
 %locations
 %%
-input: expr {
-#if 0
-  printf("program:\n");
-  print_term($1);
-  printf("\n");
-  printf("------------------------\n");
-  Value* v = eval($1, 0, 0); 
-  if (v == 0) {
-    printf("error during evaluation\n");
-  } else {
-    /*print_value(v);*/
-    printf("\n");
-  }
-#else
-  program = $1;
-#endif  
-  }
+input: expr { program = $1; }
 ;
 fields:
   /* empty */ { $$ = make_unit(); }
@@ -145,12 +131,12 @@ expr_list:
 | expr COMMA expr_list { $$ = make_list($1, $3); }
 ;
 expr:
-  LP RP             { $$ = make_unit(); }
-| INT               { $$ = make_int($1); }
-| TRUE              { $$ = make_bool(1); }
-| FALSE             { $$ = make_bool(0); }
-| STR               { $$ = make_string($1); }
-| CHAR              { $$ = make_char($1[0]); }
+  LP RP             { $$ = make_unit_term(yylloc.first_line); }
+| INT               { $$ = make_int_term(yylloc.first_line, $1); }
+| TRUE              { $$ = make_bool_term(yylloc.first_line, 1); }
+| FALSE             { $$ = make_bool_term(yylloc.first_line, 0); }
+| STR               { $$ = make_string_term(yylloc.first_line, $1); }
+| CHAR              { $$ = make_char_term(yylloc.first_line, $1[0]); }
 | ID                { $$ = make_var(yylloc.first_line, $1); }
 | HEAD expr         { $$ = make_op(yylloc.first_line, "head", make_list($2, make_unit())); }
 | TAIL expr         { $$ = make_op(yylloc.first_line, "tail", make_list($2, make_unit())); }
@@ -178,7 +164,8 @@ expr:
 | NOT expr         { $$ = make_op(yylloc.first_line, "not", make_list($2, make_unit())); }
 | MINUS expr       { $$ = make_op(yylloc.first_line, "neg", make_list($2, make_unit())); }
 | WRITE expr       { $$ = make_op(yylloc.first_line, "write", make_list($2, make_unit())); }
-| PARSE STR        { $$ = make_op(yylloc.first_line, "parse", make_list(make_string($2), make_unit())); }
+| STRING_OF expr   { $$ = make_op(yylloc.first_line, "string_of", make_list($2, make_unit())); }
+| PARSE STR        { $$ = make_op(yylloc.first_line, "parse", make_list(make_string_term(yyloc.first_line, $2), make_unit())); }
 | READ             { $$ = make_op(yylloc.first_line, "read", make_unit()); }
 | RECORD LC fields RC    { $$ = make_record(yylloc.first_line, $3); }
 | TAG expr AS ID { $$ = make_variant_term(yylloc.first_line, $4, $2); }

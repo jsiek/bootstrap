@@ -14,6 +14,7 @@ AND     "and"
 OR      "or"
 READ    "read"
 WRITE   "write"
+STRING_OF "string_of"
 PARSE   "parse"
 RECORD  "record"
 TAG     "tag"
@@ -63,6 +64,7 @@ COMMENT \/\/[^\n]*\n
 {OR} { return OR; }
 {READ} { return READ; }
 {WRITE} { return WRITE; }
+{STRING_OF} { return STRING_OF; }
 {PARSE} { return PARSE; }
 {RECORD} { return RECORD; }
 {TAG} { return TAG; }

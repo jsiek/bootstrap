@@ -34,7 +34,7 @@ int main(int argc, char* argv[])  {
     printf("\n");
     printf("------------------------\n");
   }
-  Value* result = eval(program, 0, 0); 
+  Value* result = eval(program, make_unit(), 0); 
   if (result == 0) {
     printf("error during evaluation\n");
   } else {

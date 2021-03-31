@@ -33,6 +33,7 @@ void set_tail(Value* ls, Value* v) {
   switch (ls->tag) {
   case ListV:
     ls->u.list.tail = v;
+    break;
   default:
     printf("error in set_tail, expected list, not ");
     print_value(ls);
@@ -197,7 +198,8 @@ Value* record_get(char* field, Value* record) {
     exit(-1);
   }
   default:
-    printf("error in record get, expected record\n");
+    printf("error in record get, expected record, not \n");
+    print_value(record);
     exit(-1);
   }
 }
@@ -334,6 +336,7 @@ void print_value(Value* v) {
     printf(" :: ");
     print_value(v->u.list.tail);
     printf(")");
+    break;
   }
 }
 

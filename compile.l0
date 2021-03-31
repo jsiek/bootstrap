@@ -1,0 +1,15 @@
+program: parse "input.l0";
+op2c: fun(operator) {
+  if operator = "add" then " + " else "<unknown>"
+};  
+compile: rec(compile) fun(expression) {
+  case expression of (
+    (tag int : n => string_of n.integer) or
+    (tag op : prim =>
+      compile(head(prim.arguments))
+      + op2c(prim.operator)
+      + compile(head(tail(prim.arguments))))
+  )
+};
+write compile(program)
+

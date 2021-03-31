@@ -9,6 +9,12 @@
 
 Term* make_var(int lineno, char* x);
 
+Term* make_unit_term(int lineno);
+Term* make_int_term(int lineno, int n);
+Term* make_bool_term(int lineno, int b);
+Term* make_string_term(int lineno, char* str);
+Term* make_char_term(int lineno, char c);
+
 /* Primitives */
 
 Term* make_op(int lineno, char* op, Value* args);

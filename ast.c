@@ -6,7 +6,44 @@
 /* Term Constructors */
 
 Term* make_var(int lineno, char* x) {
-  return make_variant("var", make_string(x));
+  Value* rec = make_record();
+  rec = record_set("line", make_int(lineno), rec);
+  rec = record_set("name", make_string(x), rec);
+  return make_variant("var", rec);
+}
+
+Term* make_unit_term(int lineno) {
+  Value* rec = make_record();
+  rec = record_set("line", make_int(lineno), rec);
+  return make_variant("unit", rec);
+}
+
+Term* make_int_term(int lineno, int n) {
+  Value* rec = make_record();
+  rec = record_set("line", make_int(lineno), rec);
+  rec = record_set("integer", make_int(n), rec);
+  return make_variant("int", rec);
+}
+
+Term* make_bool_term(int lineno, int b) {
+  Value* rec = make_record();
+  rec = record_set("line", make_int(lineno), rec);
+  rec = record_set("boolean", make_bool(b), rec);
+  return make_variant("bool", rec);
+}
+
+Term* make_string_term(int lineno, char* str) {
+  Value* rec = make_record();
+  rec = record_set("line", make_int(lineno), rec);
+  rec = record_set("string", make_string(str), rec);
+  return make_variant("string", rec);
+}
+
+Term* make_char_term(int lineno, char c) {
+  Value* rec = make_record();
+  rec = record_set("line", make_int(lineno), rec);
+  rec = record_set("char", make_char(c), rec);
+  return make_variant("char", rec);
 }
 
 Term* make_op(int lineno, char* op, Value* args) {
@@ -138,18 +175,18 @@ void print_fields(Term* fs) {
 }
 
 void print_term(Term* e) {
-  if (is_unit(e))
+  if (0 == strcmp("unit", variant_name(e)))
     printf("()");    
-  else if (is_int(e)) 
-    printf("%d", get_int(e));
-  else if (is_bool(e)) 
-    printf("%d", get_bool(e));
-  else if (is_string(e))
-    printf("\"%s\"", get_cstring(e));
-  else if (is_char(e))
-    printf("#%c", get_char(e));
+  else if (0 == strcmp("int", variant_name(e)))
+    printf("%d", get_int(record_get("integer", variant_value(e))));
+  else if (0 == strcmp("bool", variant_name(e)))
+    printf("%d", get_bool(record_get("boolean", variant_value(e))));
+  else if (0 == strcmp("string", variant_name(e)))
+    printf("\"%s\"", get_cstring(record_get("string", variant_value(e))));
+  else if (0 == strcmp("char", variant_name(e)))
+    printf("#%c", get_char(record_get("char", variant_value(e))));
   else if (0 == strcmp("var", variant_name(e))) {
-    printf("%s", get_cstring(variant_value(e)));
+    printf("`%s", get_cstring(record_get("name", variant_value(e))));
   } else if (0 == strcmp("get_field", variant_name(e))) {
     print_term(record_get("record", variant_value(e)));
     printf(".%s", get_cstring(record_get("field", variant_value(e))));
@@ -161,7 +198,9 @@ void print_term(Term* e) {
   } else if (0 == strcmp("lambda", variant_name(e))) {
     printf("fun (");
     print_param_list(record_get("params", variant_value(e)));
-    printf(") {...}");
+    printf(") {");
+    print_term(record_get("body", variant_value(e)));
+    printf("}");
   } else if (0 == strcmp("recursive", variant_name(e))) {
     printf("rec (");
     printf("%s", get_cstring(record_get("var", variant_value(e))));

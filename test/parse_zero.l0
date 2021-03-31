@@ -1,2 +1,5 @@
 case (parse "test/zero.l0") of
-  (tag op : ast => write (head ast.arguments))
+  (tag op : ast =>
+    case (head ast.arguments) of
+    (tag int : n => write n.integer)
+  )
