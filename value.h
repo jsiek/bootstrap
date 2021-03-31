@@ -57,6 +57,7 @@ Value* make_list(Value* head, Value* rest);
 Value* head(Value* ls);
 Value* tail(Value* ls);
 void set_tail(Value* ls, Value* v);
+int is_list(Value* v);
 
 Value* make_procedure(Value* params, Term* body, Env* env);
 

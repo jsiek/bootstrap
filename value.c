@@ -50,17 +50,6 @@ int value_list_len(Value* l) {
     return 1 + value_list_len(tail(l));
 }
 
-void print_value_list(Value* l) {
-  if (is_unit(l))
-    print_value(l);
-  else {
-    print_value(head(l));
-    if (! is_unit(tail(l)))
-      printf(" :: ");
-    print_value_list(tail(l));
-  }
-}
-
 Value* get_nth(Value* vs, int i) {
   assert(vs && vs->tag == ListV);
   if (i == 0)
@@ -76,6 +65,7 @@ Value* make_list(Value* head, Value* tail) {
   t->u.list.tail = tail;
   return t;
 }
+int is_list(Value* v) { return v->tag == ListV; }
 
 Value* make_unit() {
   Value* t = malloc(sizeof(Value));
@@ -316,10 +306,10 @@ void print_value(Value* v) {
     }
     break;
   case ProcV:
-    printf("function");
+    printf("<function>");
     break;
   case FixV:
-    printf("recursive function");
+    printf("<recursive>");
     break;
   case RecordV: {
     printf("record {");
@@ -328,7 +318,9 @@ void print_value(Value* v) {
     break;
   }
   case HandlerV:
-    printf("handler");
+    printf("handler[");
+    print_value(v->u.handler);
+    printf("]");
     break;
   case VariantV:
     printf("(tag ");
@@ -337,9 +329,11 @@ void print_value(Value* v) {
     printf(")");
     break;
   case ListV:
+    printf("(");    
     print_value(v->u.list.head);
     printf(" :: ");
     print_value(v->u.list.tail);
+    printf(")");
   }
 }
 

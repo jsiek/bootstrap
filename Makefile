@@ -1,7 +1,10 @@
+BISON = /opt/homebrew/opt/bison/bin/bison
+FLEX = /opt/homebrew/opt/flex/bin/flex
+
 l0: syntax.l syntax.y ast.h ast.c eval.h eval.c value.h value.c main.c
-	bison -d syntax.y
-	flex syntax.l
-	bison -v --debug syntax.y
+	${BISON} -d syntax.y
+	${FLEX} syntax.l
+	${BISON} -v --debug syntax.y
 	gcc -c -g lex.yy.c
 	gcc -c -g value.c
 	gcc -c -g ast.c

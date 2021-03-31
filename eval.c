@@ -12,15 +12,26 @@ void yyset_in  ( FILE * _in_str , yyscan_t yyscanner );
 int yylex_destroy ( yyscan_t yyscanner );
 
 
-int trace = 1;
+int trace = 0;
 
 Value* find_handler(char* name, Value* h) {
   if (is_unit(h)) {
     return 0;
-  } else if (0 == strcmp(name, get_cstring(head(head(h))))) {
-    return tail(head(h));
+  } else if (is_list(h)) {
+    Value* bind = head(h);
+    if (is_list(bind)) {
+      if (0 == strcmp(name, get_cstring(head(bind)))) {
+	return tail(head(h));
+      } else {
+	return find_handler(name, tail(h));
+      }
+    } else {
+      printf("error in find_handler, expected association list\n");
+      exit(-1);
+    }
   } else {
-    return find_handler(name, tail(h));
+    printf("error in find_handler, expected association list\n");
+    exit(-1);
   }
 }
 
@@ -29,7 +40,7 @@ Value* apply(Value* rator, Value* rands, int depth) {
   case ProcV: {
     Value* params = rator->u.proc.params;
     Env* env = rator->u.proc.env;
-    while (params && rands) {
+    while (is_list(params) && is_list(rands)) {
       env = make_env(get_cstring(head(params)), head(rands), env);
       params = tail(params);
       rands = tail(rands);
@@ -269,7 +280,7 @@ Value* eval_op(Term* e, Env* env, int depth) {
   } else {
     fprintf(stderr, "%s:%d: Error: operator %s is not applicable to ",
 	    input_filename, get_int(record_get("line", variant_value(e))), operator);
-    print_value_list(arg_vals); printf("\n");
+    print_value(arg_vals); printf("\n");
     exit(-1);
   }
   assert(0);

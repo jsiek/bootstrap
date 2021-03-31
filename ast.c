@@ -108,7 +108,7 @@ Term* make_handler_term(int lineno, char* name, Term* body) {
 }
 
 void print_term_list(Term* e) {
-  if (! is_unit(e)) {
+  if (is_list(e)) {
     print_term(head(e));
     if (! is_unit(tail(e)))
       printf(" , ");
