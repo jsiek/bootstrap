@@ -111,8 +111,18 @@ void print_term_list(Term* e) {
   if (is_list(e)) {
     print_term(head(e));
     if (! is_unit(tail(e)))
-      printf(" , ");
+      printf(", ");
     print_term_list(tail(e));
+  }
+}
+
+void print_param_list(Term* e) {
+  if (is_list(e)) {
+    if (is_string(head(e)))
+      printf("%s", get_cstring(head(e)));
+    if (! is_unit(tail(e)))
+      printf(", ");
+    print_param_list(tail(e));
   }
 }
 
@@ -150,8 +160,8 @@ void print_term(Term* e) {
     printf(")");
   } else if (0 == strcmp("lambda", variant_name(e))) {
     printf("fun (");
-    print_term_list(record_get("params", variant_value(e)));
-    printf(") { ...}");
+    print_param_list(record_get("params", variant_value(e)));
+    printf(") {...}");
   } else if (0 == strcmp("recursive", variant_name(e))) {
     printf("rec (");
     printf("%s", get_cstring(record_get("var", variant_value(e))));

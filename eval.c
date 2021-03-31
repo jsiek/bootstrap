@@ -14,7 +14,22 @@ int yylex_destroy ( yyscan_t yyscanner );
 
 int trace = 0;
 
-Value* find_handler(char* name, Value* h) {
+void runtime_error(Term* e, char* message) {
+  Value* record = variant_value(e);
+  fprintf(stderr, "%s:%d: %s", input_filename, get_int(record_get("line", record)),
+	  message);
+  abort();
+}
+
+void internal_error(Term* e, char* message) {
+  Value* record = variant_value(e);
+  fprintf(stderr, "%s:%d: [internal] %s", input_filename,
+	  get_int(record_get("line", record)),
+	  message);
+  abort();
+}
+
+Value* find_handler(char* name, Value* h, Term* e) {
   if (is_unit(h)) {
     return 0;
   } else if (is_list(h)) {
@@ -23,19 +38,19 @@ Value* find_handler(char* name, Value* h) {
       if (0 == strcmp(name, get_cstring(head(bind)))) {
 	return tail(head(h));
       } else {
-	return find_handler(name, tail(h));
+	return find_handler(name, tail(h), e);
       }
     } else {
-      printf("error in find_handler, expected association list\n");
-      exit(-1);
+      internal_error(e, "in find_handler, expected association list\n");
+      return 0;
     }
   } else {
-    printf("error in find_handler, expected association list\n");
-    exit(-1);
+    internal_error(e, "in find_handler, expected association list\n");
+    return 0;
   }
 }
 
-Value* apply(Value* rator, Value* rands, int depth) {
+Value* apply(Value* rator, Value* rands, int depth, Term* e) {
   switch (rator->tag) {
   case ProcV: {
     Value* params = rator->u.proc.params;
@@ -48,13 +63,12 @@ Value* apply(Value* rator, Value* rands, int depth) {
     return eval(rator->u.proc.body, env, depth + 1);
   }
   case FixV: {
-    return apply(apply(rator->u.fix.fun, make_list(rator, make_unit()), depth), rands, depth);
+    return apply(apply(rator->u.fix.fun, make_list(rator, make_unit()), depth, e),
+		 rands, depth, e);
   }
   default:
-    printf("Error, attempt to call something that was not a function\n");
-    print_value(rator);
-    printf("\n");
-    exit(-1); return 0;
+    runtime_error(e, "call expected a function\n");
+    return 0;
   }
 }
 
@@ -90,7 +104,7 @@ void indent(int depth) {
     printf(" ");
 }
 
-void write_value(Value* v) {
+void write_value(Value* v, Term* e) {
   switch (v->tag) {
   case CharV:
     putchar(v->u._char);
@@ -109,10 +123,7 @@ void write_value(Value* v) {
     }
     break;
   default:
-    printf("error, can't write ");
-    print_value(v);
-    printf("\n");
-    exit(-1);
+    internal_error(e, "error in write, unhandled value\n");
   }
 }
 
@@ -127,7 +138,7 @@ Value* eval_op(Term* e, Env* env, int depth) {
     return make_char(getchar());
   } else if (0 == strcmp("write", operator)) {
     Value* argument = get_nth(arg_vals, 0);
-    write_value(argument);
+    write_value(argument, e);
     return make_unit();
   } else if (0 == strcmp("parse", operator)) {
     yyscan_t scanner;
@@ -136,15 +147,13 @@ Value* eval_op(Term* e, Env* env, int depth) {
     char* file_name = get_cstring(argument);
     FILE* file = fopen(file_name, "r");
     if (!file) {
-      printf("error, could not open file \"%s\"\n", file_name);
-      exit(-1);
+      char message[1000];
+      snprintf(message, 1000, "could not open file \"%s\"\n", file_name);
+      runtime_error(e, message);
     }
     yyset_in(file, scanner);
     yyparse(scanner);
     yylex_destroy(scanner);
-    //printf("parsed program\n");
-    //print_term(program);
-    //printf("\n");
     return program;
   } else if (0 == strcmp("neg", operator)) {
     Value* v = get_nth(arg_vals, 0);
@@ -223,8 +232,7 @@ Value* eval_op(Term* e, Env* env, int depth) {
       lr[ln+1] = 0;
       return make_string(lr);
     } else {
-      printf("error in addition\n");
-      exit(-1);
+      runtime_error(e, "invalid argument in addition\n");
     }
   } else if (0 == strcmp("sub", operator)) {
     Value* left = get_nth(arg_vals, 0);
@@ -232,8 +240,7 @@ Value* eval_op(Term* e, Env* env, int depth) {
     if (is_int(left) && is_int(right)) {      
       return make_int(get_int(left) - get_int(right));
     } else {
-      printf("error in subtraction\n");
-      exit(-1);
+      runtime_error(e, "invalid argument in subtraction\n");
     }
   } else if (0 == strcmp("mul", operator)) {
     Value* left = get_nth(arg_vals, 0);
@@ -241,8 +248,7 @@ Value* eval_op(Term* e, Env* env, int depth) {
     if (is_int(left) && is_int(right)) {      
       return make_int(get_int(left) * get_int(right));
     } else {
-      printf("error in multiplication\n");
-      exit(-1);
+      runtime_error(e, "invalid argument in multiplication\n");
     }
   } else if (0 == strcmp("div", operator)) {
     Value* left = get_nth(arg_vals, 0);
@@ -250,8 +256,7 @@ Value* eval_op(Term* e, Env* env, int depth) {
     if (is_int(left) && is_int(right)) {      
       return make_int(get_int(left) / get_int(right));
     } else {
-      printf("error in division\n");
-      exit(-1);
+      runtime_error(e, "invalid argument in division\n");
     }
   } else if (0 == strcmp("mod", operator)) {
     Value* left = get_nth(arg_vals, 0);
@@ -259,8 +264,7 @@ Value* eval_op(Term* e, Env* env, int depth) {
     if (is_int(left) && is_int(right)) {
       return make_int(get_int(left) % get_int(right));
     } else {
-      printf("error in modulo\n");
-      exit(-1);
+      runtime_error(e, "invalid argument in modulo\n");
     }
   } else if (0 == strcmp("less", operator)) {
     Value* left = get_nth(arg_vals, 0);
@@ -268,20 +272,29 @@ Value* eval_op(Term* e, Env* env, int depth) {
     if (is_int(left) && is_int(right)) {
       return make_bool(get_int(left) < get_int(right));
     } else {
-      printf("error in less than\n");
+      runtime_error(e, "invalid argument in less than\n");
       exit(-1);
     }
   } else if (0 == strcmp("head", operator)) {
-    return head(get_nth(arg_vals, 0));
+    Value* arg = get_nth(arg_vals, 0);
+    if (is_list(arg)) {
+      return head(arg);
+    } else {
+      runtime_error(e, "head expected a list argument");
+    }
   } else if (0 == strcmp("tail", operator)) {
-    return tail(get_nth(arg_vals, 0));
+    Value* arg = get_nth(arg_vals, 0);
+    if (is_list(arg)) {
+      return tail(arg);
+    } else {
+      runtime_error(e, "tail expected a list argument");
+    }
   } else if (0 == strcmp("make_list", operator)) {
     return make_list(get_nth(arg_vals, 0), get_nth(arg_vals, 1));
   } else {
-    fprintf(stderr, "%s:%d: Error: operator %s is not applicable to ",
-	    input_filename, get_int(record_get("line", variant_value(e))), operator);
-    print_value(arg_vals); printf("\n");
-    exit(-1);
+    char message[1000];
+    snprintf(message, 1000, "error in operator %s\n", operator);
+    runtime_error(e, message);
   }
   assert(0);
   return 0;
@@ -293,8 +306,7 @@ Value* eval(Term* e, Env* env, int depth) {
   }
   Value* result = make_unit();
   if (depth > 10000) {
-    fprintf(stdout, "procedure call stack too large, terminating\n");
-    exit(-1);
+    runtime_error(e, "procedure call stack too large, terminating\n");
   }
   if (is_char(e)) {
     result = e;
@@ -309,11 +321,12 @@ Value* eval(Term* e, Env* env, int depth) {
   } else if (0 == strcmp("var", variant_name(e))) {
     char* name = get_cstring(variant_value(e));
     Value* val = lookup(name, env);
-    if (val == 0) {
-      printf("Undefined variable: %s\n", name);
-      exit(-1);
-    } else {
+    if (val) {
       result = val;
+    } else {
+      char message[1000];
+      snprintf(message, 1000, "use of undefined variable: %s\n", name);
+      runtime_error(e, message);
     }
   } else if (0 == strcmp("lambda", variant_name(e))) {
     result = make_procedure(record_get("params", variant_value(e)),
@@ -322,7 +335,7 @@ Value* eval(Term* e, Env* env, int depth) {
   } else if (0 == strcmp("application", variant_name(e))) {
     Value* rator = eval(record_get("rator", variant_value(e)), env, depth + 1);
     Value* rands = eval_list(record_get("rands", variant_value(e)), env, depth + 1);
-    result = apply(rator, rands, depth);
+    result = apply(rator, rands, depth, e);
   } else if (0 == strcmp("recursive", variant_name(e))) {
     Env* env2 = make_env(get_cstring(record_get("var", variant_value(e))), 0, env);
     Value* v = eval(record_get("body", variant_value(e)), env2, depth + 1);
@@ -343,10 +356,7 @@ Value* eval(Term* e, Env* env, int depth) {
 	result = eval(record_get("else", variant_value(e)), env, depth + 1);
       }
     } else {
-      printf("Error, expected a Boolean in test of if-then-else, not:\n");
-      print_value(cond);
-      printf("\n");
-      exit(-1);
+      runtime_error(e, "expected a Boolean in test of if-then-else\n");
     }
   } else if (0 == strcmp("record", variant_name(e))) {
     Value* l = record_get("fields", variant_value(e));
@@ -357,19 +367,15 @@ Value* eval(Term* e, Env* env, int depth) {
     if (is_record(rec)) {
       char* field = get_cstring(record_get("field", variant_value(e)));
       Value* val = lookup(field, rec->u.record.fields);
-      if (val == 0) {
-	printf("field %s is not present in record:\n", field);
-	print_value(rec);
-	printf("\n");
-	exit(-1);
-      } else {
+      if (val) {
 	result = val;
+      } else {
+	char message[1000];
+	snprintf(message, 1000, "field %s is not present in record:\n", field);
+	runtime_error(e, message);
       }
     } else {
-      printf("expected a record on left side of period in field access expression, not:\n");
-      print_value(rec);
-      printf("\n");
-      exit(-1); 
+      runtime_error(e, "expected a record  in field access\n");
     }
   } else if (0 == strcmp("set_field", variant_name(e))) {
     Value* rec = eval(record_get("record", variant_value(e)), env, depth + 1);
@@ -379,10 +385,7 @@ Value* eval(Term* e, Env* env, int depth) {
       Env* fields = make_env(field, replacement, rec->u.record.fields);
       result = make_record(fields);
     } else {
-      printf("expected a record on left side of period in field access expression, not:\n");
-      print_value(rec);
-      printf("\n");
-      exit(-1); 
+      runtime_error(e, "expected a record in field access\n");
     }
   } else if (0 == strcmp("variant", variant_name(e))) {
     Value* val = eval(record_get("init", variant_value(e)), env, depth + 1);
@@ -399,32 +402,25 @@ Value* eval(Term* e, Env* env, int depth) {
     case VariantV:
       switch (handler->tag) {
       case HandlerV: {
-	Value* h = find_handler(descr->u.variant.name, handler->u.handler);
+	Value* h = find_handler(descr->u.variant.name, handler->u.handler, e);
 	if (h == 0) {
-	  printf("Error, could not find handler for %s\n", descr->u.variant.name);
-	  exit(-1);
+	  char message[1000];
+	  snprintf(message, 1000, "could not find handler for %s\n",
+		   descr->u.variant.name);
+	  runtime_error(e, message);
 	}
-	result = apply(h, make_list(descr->u.variant.val, make_unit()), depth);
+	result = apply(h, make_list(descr->u.variant.val, make_unit()), depth, e);
 	break;
       }
       default:
-	printf("Error, expected handler for case expression, not:\n");
-	print_value(descr);
-	printf("\n");
-	exit(-1); 
+	runtime_error(e, "expected handler in case\n");
       }
       break;
     default:
-      printf("%s:%d: Error, expected variant in case expression, not:\n",
-	     input_filename, get_int(record_get("line", variant_value(e))));
-      print_value(descr);
-      printf("\n");
-      exit(-1); 
+      runtime_error(e, "expected variant in case\n");
     }
   } else {
-    printf("eval unrecognized expression\n");
-    print_term(e);
-    exit(-1);
+    runtime_error(e, "in eval, unrecognized expression\n");
   }
   if (trace) {
     indent(depth);
