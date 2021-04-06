@@ -83,6 +83,7 @@ Term* program;
 %token GT
 %token BAR
 %token CASE
+%token SWITCH
 %token HANDLE
 %token LEFT_ARROW
 %token IF
@@ -169,14 +170,14 @@ expr:
 | READ             { $$ = make_op(yylloc.first_line, "read", make_unit()); }
 | RECORD LC fields RC    { $$ = make_record(yylloc.first_line, $3); }
 | TAG expr AS ID { $$ = make_variant_term(yylloc.first_line, $4, $2); }
-| TAG ID HANDLE expr { 
+| CASE ID HANDLE expr { 
     $$ = make_handler_term(yylloc.first_line, $2, $4);
   }
-| TAG ID COLON ID HANDLE expr { 
+| CASE ID OF ID HANDLE expr { 
     $$ = make_handler_term(yylloc.first_line, $2, make_lambda(yylloc.first_line,
 						     make_list(make_string($4), make_unit()), $6));
   }
-| CASE expr OF expr { $$ = make_case(yylloc.first_line, $2, $4); }
+| SWITCH expr LC expr RC { $$ = make_case(yylloc.first_line, $2, $4); }
 | ID COLON expr SEMICOLON expr { $$ = make_let(yylloc.first_line, $1, $3, $5); }
 | expr PERIOD ID LEFT_ARROW expr { $$ = make_field_update(yylloc.first_line, $1, $3, $5); }
 ;

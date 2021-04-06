@@ -26,6 +26,7 @@ FALSE   "false"
 IF      "if"
 THEN    "then"
 ELSE    "else"
+SWITCH   "switch"
 CASE    "case"
 OF      "of"
 BAR     "|"
@@ -73,6 +74,7 @@ COMMENT \/\/[^\n]*\n
 {IF} { return IF; }
 {THEN} { return THEN; }
 {ELSE} { return ELSE; }
+{SWITCH} { return SWITCH; }
 {CASE} { return CASE; }
 {OF} { return OF; }
 {HANDLE} { return HANDLE; }
